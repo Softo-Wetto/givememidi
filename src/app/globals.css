@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f0f2f5;
+  --foreground: #111827;
+  --accent: #3b82f6;
+  --accent-dark: #2563eb;
+  --card-bg: #ffffff;
+  --card-bg-dark: #1f2937;
+  --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card-bg: #1f2937;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition: background 0.3s, color 0.3s;
+}
+
+button, select {
+  transition: all 0.2s;
+}
+
+/* Hide scrollbar but keep scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
