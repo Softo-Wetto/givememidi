@@ -3,17 +3,45 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Menu, X, Search, Upload, Music, LogIn, Bookmark } from "lucide-react";
+import { Menu, X, Search, Upload, Music, LogIn, Bookmark, LogOut } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { supabase } from "../../lib/supbaseClient";
 import { useAuth } from "./AuthProvider";
-import type { User } from "@supabase/supabase-js";
-import { User as UserIcon, LogOut } from "lucide-react";
-import { ensureProfileForCurrentUser } from "../../lib/ensureProfile";
-import { UploadCloud } from "lucide-react";
 
 type ProfileRow = {
   username: string | null;
 };
+
+type NavLinkProps = {
+  href: string;
+  label: string;
+  active: boolean;
+  onNavigate?: () => void;
+};
+
+function NavLink({ href, label, active, onNavigate }: NavLinkProps) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`group relative px-3 py-2 rounded-xl text-sm font-medium transition-all
+        ${
+          active
+            ? "text-white bg-white/5 border border-white/10"
+            : "text-gray-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10"
+        }`}
+    >
+      {label}
+      <span
+        className={`pointer-events-none absolute left-3 right-3 -bottom-[1px] h-[2px] origin-left scale-x-0
+          bg-gradient-to-r from-blue-400 to-indigo-400
+          transition-transform duration-300
+          ${active ? "scale-x-100" : "group-hover:scale-x-100"}`}
+      />
+    </Link>
+  );
+}
 
 export function Header() {
   const router = useRouter();
@@ -28,101 +56,85 @@ export function Header() {
 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // close dropdown on outside click
+  // Close dropdown on outside click
   useEffect(() => {
+    if (!profileOpen) return;
+
     const close = () => setProfileOpen(false);
-    if (profileOpen) window.addEventListener("click", close);
+    window.addEventListener("click", close);
+
     return () => window.removeEventListener("click", close);
   }, [profileOpen]);
 
-  // scroll animation
+  // Scroll animation
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll);
+    onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // auth session + username
-    useEffect(() => {
-      let alive = true;
+  // Load username when user changes
+  useEffect(() => {
+    let alive = true;
 
-      const loadUsername = async () => {
-        if (!user) {
-          setUsername(null);
-          return;
-        }
+    const loadUsername = async () => {
+      if (!user) {
+        setUsername(null);
+        return;
+      }
 
-        const { data: prof, error } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", user.id)
-          .maybeSingle<ProfileRow>();
+      const { data: prof, error } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle<ProfileRow>();
 
-        if (!alive) return;
+      if (!alive) return;
 
-        if (error) {
-          console.error("Header profile fetch error:", error);
-          setUsername(null);
-          return;
-        }
+      if (error) {
+        console.error("Header profile fetch error:", error);
+        setUsername(null);
+        return;
+      }
 
-        setUsername(prof?.username ?? null);
-      };
+      setUsername(prof?.username ?? null);
+    };
 
-      loadUsername();
+    loadUsername();
 
-      return () => {
-        alive = false;
-      };
-    }, [user]);
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-    router.push(`/midi?search=${encodeURIComponent(searchQuery)}`);
+    const q = searchQuery.trim();
+    if (!q) return;
+
+    router.push(`/midi?search=${encodeURIComponent(q)}`);
     setSearchQuery("");
     setMobileOpen(false);
   };
 
   const activePath = useMemo(() => pathname ?? "/", [pathname]);
 
-  const NavLink = ({ href, label }: { href: string; label: string }) => {
-    const active = activePath === href;
-    return (
-      <Link
-        href={href}
-        onClick={() => setMobileOpen(false)}
-        className={`group relative px-3 py-2 rounded-xl text-sm font-medium transition-all
-          ${
-            active
-              ? "text-white bg-white/5 border border-white/10"
-              : "text-gray-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10"
-          }`}
-      >
-        {label}
-        <span
-          className={`pointer-events-none absolute left-3 right-3 -bottom-[1px] h-[2px] origin-left scale-x-0
-            bg-gradient-to-r from-blue-400 to-indigo-400
-            transition-transform duration-300
-            ${active ? "scale-x-100" : "group-hover:scale-x-100"}`}
-        />
-      </Link>
-    );
-  };
+  const closeMobile = () => setMobileOpen(false);
 
   const goUpload = () => {
-    setMobileOpen(false);
+    closeMobile();
 
-    if (authLoading) return; // wait for auth to resolve
+    if (authLoading) return;
 
     if (user) {
       router.push("/upload");
       return;
     }
+
     const next = pathname && pathname !== "/login" ? pathname : "/upload";
     router.push(`/login?redirect=${encodeURIComponent(next)}`);
   };
-
 
   return (
     <header
@@ -136,7 +148,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group shrink-0">
+          <Link href="/" className="flex items-center gap-2 group shrink-0" onClick={closeMobile}>
             <Music className="w-6 h-6 text-blue-400 group-hover:rotate-6 transition" />
             <span className="text-xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
               GiveMeMIDI
@@ -168,15 +180,16 @@ export function Header() {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-2">
-            <NavLink href="/midi" label="All MIDI" />
-            <NavLink href="/contact" label="Contact" />
-            <NavLink href="/about" label="About" />
+            <NavLink href="/midi" label="All MIDI" active={activePath === "/midi"} />
+            <NavLink href="/contact" label="Contact" active={activePath === "/contact"} />
+            <NavLink href="/about" label="About" active={activePath === "/about"} />
           </nav>
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3 relative">
             {/* Upload button */}
             <button
+              type="button"
               onClick={goUpload}
               className="flex items-center gap-2 px-4 py-2 rounded-xl
                 bg-gradient-to-r from-blue-500 to-indigo-500
@@ -191,6 +204,7 @@ export function Header() {
             {user ? (
               <div className="relative">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setProfileOpen((v) => !v);
@@ -218,6 +232,7 @@ export function Header() {
                 {/* Dropdown */}
                 {profileOpen && (
                   <div
+                    onClick={(e) => e.stopPropagation()}
                     className="absolute right-0 mt-2 w-64 rounded-2xl
                       bg-gray-900 border border-gray-700 shadow-2xl overflow-hidden
                       animate-in fade-in zoom-in-95"
@@ -235,7 +250,6 @@ export function Header() {
 
                     {/* Links */}
                     <div className="py-1">
-
                       <Link
                         href="/profile"
                         onClick={() => setProfileOpen(false)}
@@ -260,20 +274,18 @@ export function Header() {
                         href="/myuploads"
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5
-                          text-sm text-gray-300
-                          hover:bg-gray-800 hover:text-white
-                          transition"
+                          text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition"
                       >
                         <UploadCloud size={16} className="text-indigo-300" />
                         My Uploads
                       </Link>
-
                     </div>
 
                     <div className="h-px bg-gray-700" />
 
                     {/* Sign out */}
                     <button
+                      type="button"
                       onClick={async () => {
                         await supabase.auth.signOut();
                         setProfileOpen(false);
@@ -305,7 +317,8 @@ export function Header() {
 
           {/* Mobile menu toggle */}
           <button
-            onClick={() => setMobileOpen(!mobileOpen)}
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
             className="md:hidden text-gray-300 hover:text-white"
             aria-label="Open menu"
           >
@@ -328,7 +341,7 @@ export function Header() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-3 bg-transparent text-white focus:outline-none"
               />
-              <button className="px-4 text-gray-300 hover:text-white" aria-label="Search">
+              <button type="submit" className="px-4 text-gray-300 hover:text-white" aria-label="Search">
                 <Search size={18} />
               </button>
             </form>
@@ -337,7 +350,7 @@ export function Header() {
             <nav className="flex flex-col gap-2 text-sm mt-4">
               <Link
                 href="/midi"
-                onClick={() => setMobileOpen(false)}
+                onClick={closeMobile}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
                 All MIDI
@@ -345,7 +358,7 @@ export function Header() {
 
               <Link
                 href="/contact"
-                onClick={() => setMobileOpen(false)}
+                onClick={closeMobile}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
                 Contact
@@ -353,7 +366,7 @@ export function Header() {
 
               <Link
                 href="/about"
-                onClick={() => setMobileOpen(false)}
+                onClick={closeMobile}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
                 About
@@ -363,6 +376,7 @@ export function Header() {
             {/* Mobile Actions */}
             <div className="flex flex-col gap-3 pt-4">
               <button
+                type="button"
                 onClick={goUpload}
                 className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                   bg-gradient-to-r from-blue-500 to-indigo-500
@@ -375,10 +389,9 @@ export function Header() {
 
               {user ? (
                 <>
-
                   <Link
                     href="/profile"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={closeMobile}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -388,7 +401,7 @@ export function Header() {
 
                   <Link
                     href="/bookmarks"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={closeMobile}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -398,7 +411,7 @@ export function Header() {
 
                   <Link
                     href="/myuploads"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={closeMobile}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -407,9 +420,10 @@ export function Header() {
                   </Link>
 
                   <button
+                    type="button"
                     onClick={async () => {
                       await supabase.auth.signOut();
-                      setMobileOpen(false);
+                      closeMobile();
                       router.push("/");
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
@@ -422,7 +436,7 @@ export function Header() {
               ) : (
                 <Link
                   href="/login"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={closeMobile}
                   className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                     border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                 >

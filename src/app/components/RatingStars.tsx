@@ -72,7 +72,6 @@ export function RatingStars({ midiId, compact }: Props) {
       mounted = false;
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [midiId]);
 
   const display = hover ?? myRating ?? 0;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supbaseClient";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Loader,
@@ -25,6 +26,25 @@ type BookmarkRow = {
   id: string;
   midi: MidiRow;
   created_at?: string;
+};
+
+type BookmarkDbRow = {
+  id: string;
+  created_at: string;
+  music_files:
+    | {
+        id: string;
+        title: string;
+        composer: string | null;
+        pdf_url: string | null;
+      }
+    | Array<{
+        id: string;
+        title: string;
+        composer: string | null;
+        pdf_url: string | null;
+      }>
+    | null;
 };
 
 type RatingAgg = { sum: number; count: number };
@@ -134,7 +154,7 @@ export default function BookmarksPage() {
     }
 
     const formatted: BookmarkRow[] = (data ?? [])
-      .map((b: any) => {
+      .map((b: BookmarkDbRow) => {
         const mf = Array.isArray(b.music_files) ? b.music_files[0] : b.music_files;
         if (!mf) return null;
         return {
@@ -191,10 +211,15 @@ export default function BookmarksPage() {
   };
 
   // keep ratingMap in sync if user removes bookmarks
-  useEffect(() => {
-    const ids = bookmarks.map((b) => b.midi.id);
-    fetchRatingAggForMidiIds(ids).then(setRatingMap);
-  }, [bookmarks.length]); // small + safe trigger
+const bookmarkIdsKey = useMemo(
+  () => bookmarks.map((b) => b.midi.id).join("|"),
+  [bookmarks]
+);
+
+useEffect(() => {
+  const ids = bookmarks.map((b) => b.midi.id);
+  fetchRatingAggForMidiIds(ids).then(setRatingMap);
+}, [bookmarkIdsKey]);
 
   if (loading) {
     return (
@@ -274,7 +299,8 @@ export default function BookmarksPage() {
         {/* No results */}
         {bookmarks.length > 0 && filtered.length === 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center text-gray-300">
-            No matches for <span className="font-semibold">"{query.trim()}"</span>
+            No matches for{" "}
+            <span className="font-semibold">&quot;{query.trim()}&quot;</span>
           </div>
         )}
 
@@ -295,9 +321,11 @@ export default function BookmarksPage() {
                   {/* Thumbnail */}
                   <div className="w-full h-44 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden">
                     {b.midi.pdf_url ? (
-                      <img
+                      <Image
                         src="/sheet-music-placeholder.png"
                         alt="Sheet music available"
+                        width={800}
+                        height={600}
                         className="object-contain w-5/6 h-5/6"
                       />
                     ) : (
