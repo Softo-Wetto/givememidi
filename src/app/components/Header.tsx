@@ -3,45 +3,26 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Menu, X, Search, Upload, Music, LogIn, Bookmark, LogOut } from "lucide-react";
+import {
+  Menu,
+  X,
+  Search,
+  Upload,
+  Music,
+  LogIn,
+  Bookmark,
+  LogOut,
+  ChevronDown,
+} from "lucide-react";
 import { User as UserIcon } from "lucide-react";
 import { UploadCloud } from "lucide-react";
 import { supabase } from "../../lib/supbaseClient";
 import { useAuth } from "./AuthProvider";
+import { Users } from "lucide-react";
 
 type ProfileRow = {
   username: string | null;
 };
-
-type NavLinkProps = {
-  href: string;
-  label: string;
-  active: boolean;
-  onNavigate?: () => void;
-};
-
-function NavLink({ href, label, active, onNavigate }: NavLinkProps) {
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className={`group relative px-3 py-2 rounded-xl text-sm font-medium transition-all
-        ${
-          active
-            ? "text-white bg-white/5 border border-white/10"
-            : "text-gray-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10"
-        }`}
-    >
-      {label}
-      <span
-        className={`pointer-events-none absolute left-3 right-3 -bottom-[1px] h-[2px] origin-left scale-x-0
-          bg-gradient-to-r from-blue-400 to-indigo-400
-          transition-transform duration-300
-          ${active ? "scale-x-100" : "group-hover:scale-x-100"}`}
-      />
-    </Link>
-  );
-}
 
 export function Header() {
   const router = useRouter();
@@ -55,16 +36,28 @@ export function Header() {
   const [username, setUsername] = useState<string | null>(null);
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
 
-  // Close dropdown on outside click
+  const activePath = useMemo(() => pathname ?? "/", [pathname]);
+
+  const closeAll = () => {
+    setMobileOpen(false);
+    setDiscoverOpen(false);
+    setProfileOpen(false);
+  };
+
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!profileOpen) return;
+    if (!profileOpen && !discoverOpen) return;
 
-    const close = () => setProfileOpen(false);
+    const close = () => {
+      setProfileOpen(false);
+      setDiscoverOpen(false);
+    };
+
     window.addEventListener("click", close);
-
     return () => window.removeEventListener("click", close);
-  }, [profileOpen]);
+  }, [profileOpen, discoverOpen]);
 
   // Scroll animation
   useEffect(() => {
@@ -74,7 +67,7 @@ export function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Load username when user changes
+  // Load username
   useEffect(() => {
     let alive = true;
 
@@ -118,12 +111,8 @@ export function Header() {
     setMobileOpen(false);
   };
 
-  const activePath = useMemo(() => pathname ?? "/", [pathname]);
-
-  const closeMobile = () => setMobileOpen(false);
-
   const goUpload = () => {
-    closeMobile();
+    closeAll();
 
     if (authLoading) return;
 
@@ -148,7 +137,11 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group shrink-0" onClick={closeMobile}>
+          <Link
+            href="/"
+            className="flex items-center gap-2 group shrink-0"
+            onClick={closeAll}
+          >
             <Music className="w-6 h-6 text-blue-400 group-hover:rotate-6 transition" />
             <span className="text-xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
               GiveMeMIDI
@@ -178,35 +171,120 @@ export function Header() {
             </button>
           </form>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-2">
-            <NavLink href="/midi" label="All MIDI" active={activePath === "/midi"} />
-            <NavLink href="/contact" label="Contact" active={activePath === "/contact"} />
-            <NavLink href="/about" label="About" active={activePath === "/about"} />
-          </nav>
-
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3 relative">
-            {/* Upload button */}
-            <button
-              type="button"
-              onClick={goUpload}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl
-                bg-gradient-to-r from-blue-500 to-indigo-500
-                hover:from-blue-400 hover:to-indigo-400
-                font-semibold text-white shadow-lg transition"
-            >
-              <Upload size={16} />
-              Upload
-            </button>
+            {/* Discover + Upload group (keeps them right beside each other) */}
+            <div className="relative flex items-center gap-2">
+              {/* Discover */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDiscoverOpen((v) => !v);
+                    setProfileOpen(false);
+                  }}
+                  className={`group inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition
+                    ${
+                      discoverOpen
+                        ? "text-white bg-white/10 border border-blue-400/30"
+                        : "text-gray-200 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-400/40"
+                    }`}
+                  aria-haspopup="menu"
+                  aria-expanded={discoverOpen}
+                >
+                  Discover
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform ${
+                      discoverOpen
+                        ? "rotate-180 text-white"
+                        : "text-gray-400 group-hover:text-white"
+                    }`}
+                  />
+                </button>
 
-            {/* Profile / Login on far right */}
+                {discoverOpen && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-0 mt-2 w-64 rounded-2xl bg-gray-900 border border-gray-700 shadow-2xl overflow-hidden
+                               animate-in fade-in zoom-in-95"
+                    role="menu"
+                  >
+                    <div className="px-4 py-3 border-b border-gray-700">
+                      <p className="text-xs text-gray-400">Explore</p>
+                      <p className="text-sm font-semibold text-white">
+                        Discover content
+                      </p>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        href="/midi"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/5 transition"
+                        role="menuitem"
+                      >
+                        <span className="opacity-90">🎵</span> All MIDI
+                      </Link>
+
+                      <Link
+                        href="/creators"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/5 transition"
+                        role="menuitem"
+                      >
+                        <span className="opacity-90">🏆</span> Top Creators
+                      </Link>
+                    </div>
+
+                    <div className="h-px bg-gray-700" />
+
+                    <div className="py-1">
+                      <Link
+                        href="/about"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition"
+                        role="menuitem"
+                      >
+                        <span className="opacity-80">ℹ️</span> About
+                      </Link>
+
+                      <Link
+                        href="/contact"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition"
+                        role="menuitem"
+                      >
+                        <span className="opacity-80">✉️</span> Contact
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload */}
+              <button
+                type="button"
+                onClick={goUpload}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl
+                  bg-gradient-to-r from-blue-500 to-indigo-500
+                  hover:from-blue-400 hover:to-indigo-400
+                  font-semibold text-white shadow-lg transition"
+              >
+                <Upload size={16} />
+                Upload
+              </button>
+            </div>
+
+            {/* Profile / Login */}
             {user ? (
               <div className="relative">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setDiscoverOpen(false);
                     setProfileOpen((v) => !v);
                   }}
                   className="flex items-center gap-2 pl-2 pr-3 py-2 rounded-xl
@@ -229,7 +307,6 @@ export function Header() {
                   </div>
                 </button>
 
-                {/* Dropdown */}
                 {profileOpen && (
                   <div
                     onClick={(e) => e.stopPropagation()}
@@ -237,7 +314,6 @@ export function Header() {
                       bg-gray-900 border border-gray-700 shadow-2xl overflow-hidden
                       animate-in fade-in zoom-in-95"
                   >
-                    {/* User info */}
                     <div className="px-4 py-3 border-b border-gray-700">
                       <p className="text-xs text-gray-400">Signed in as</p>
                       <p className="truncate text-sm font-semibold text-white">
@@ -248,13 +324,11 @@ export function Header() {
                       </p>
                     </div>
 
-                    {/* Links */}
                     <div className="py-1">
                       <Link
                         href="/profile"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5
-                          text-sm text-gray-200 hover:bg-white/5 transition"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
                       >
                         <UserIcon size={16} className="text-blue-300" />
                         Profile
@@ -263,8 +337,7 @@ export function Header() {
                       <Link
                         href="/bookmarks"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5
-                          text-sm text-gray-200 hover:bg-white/5 transition"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
                       >
                         <Bookmark size={16} className="text-blue-400" />
                         Bookmarks
@@ -273,17 +346,24 @@ export function Header() {
                       <Link
                         href="/myuploads"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5
-                          text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition"
                       >
                         <UploadCloud size={16} className="text-indigo-300" />
                         My Uploads
+                      </Link>
+
+                      <Link
+                        href="/connections"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
+                      >
+                        <Users size={16} className="text-emerald-300" />
+                        Connections
                       </Link>
                     </div>
 
                     <div className="h-px bg-gray-700" />
 
-                    {/* Sign out */}
                     <button
                       type="button"
                       onClick={async () => {
@@ -291,8 +371,7 @@ export function Header() {
                         setProfileOpen(false);
                         router.push("/");
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3
-                        text-sm text-red-300 hover:bg-red-500/10 transition"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-300 hover:bg-red-500/10 transition"
                     >
                       <LogOut size={16} />
                       Sign out
@@ -329,7 +408,6 @@ export function Header() {
         {/* Mobile Menu */}
         {mobileOpen && (
           <div className="md:hidden mt-4 pb-6 border-t border-gray-800 pt-6">
-            {/* Mobile Search */}
             <form
               onSubmit={handleSearch}
               className="flex items-center bg-gray-800/70 rounded-2xl overflow-hidden border border-gray-700"
@@ -341,39 +419,49 @@ export function Header() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-3 bg-transparent text-white focus:outline-none"
               />
-              <button type="submit" className="px-4 text-gray-300 hover:text-white" aria-label="Search">
+              <button
+                type="submit"
+                className="px-4 text-gray-300 hover:text-white"
+                aria-label="Search"
+              >
                 <Search size={18} />
               </button>
             </form>
 
-            {/* Links */}
             <nav className="flex flex-col gap-2 text-sm mt-4">
               <Link
                 href="/midi"
-                onClick={closeMobile}
+                onClick={closeAll}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
-                All MIDI
+                🎵 All MIDI
+              </Link>
+
+              <Link
+                href="/creators"
+                onClick={closeAll}
+                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
+              >
+                🏆 Top Creators
               </Link>
 
               <Link
                 href="/contact"
-                onClick={closeMobile}
+                onClick={closeAll}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
-                Contact
+                ✉️ Contact
               </Link>
 
               <Link
                 href="/about"
-                onClick={closeMobile}
+                onClick={closeAll}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
               >
-                About
+                ℹ️ About
               </Link>
             </nav>
 
-            {/* Mobile Actions */}
             <div className="flex flex-col gap-3 pt-4">
               <button
                 type="button"
@@ -391,7 +479,7 @@ export function Header() {
                 <>
                   <Link
                     href="/profile"
-                    onClick={closeMobile}
+                    onClick={closeAll}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -401,7 +489,7 @@ export function Header() {
 
                   <Link
                     href="/bookmarks"
-                    onClick={closeMobile}
+                    onClick={closeAll}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -411,7 +499,7 @@ export function Header() {
 
                   <Link
                     href="/myuploads"
-                    onClick={closeMobile}
+                    onClick={closeAll}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
@@ -419,11 +507,21 @@ export function Header() {
                     My Uploads
                   </Link>
 
+                  <Link
+                    href="/connections"
+                    onClick={closeAll}
+                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+                      border border-gray-700 text-gray-200 hover:border-blue-400 transition"
+                  >
+                    <Users size={16} className="text-emerald-300" />
+                    Connections
+                  </Link>
+
                   <button
                     type="button"
                     onClick={async () => {
                       await supabase.auth.signOut();
-                      closeMobile();
+                      closeAll();
                       router.push("/");
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
@@ -436,7 +534,7 @@ export function Header() {
               ) : (
                 <Link
                   href="/login"
-                  onClick={closeMobile}
+                  onClick={closeAll}
                   className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                     border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                 >

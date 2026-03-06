@@ -7,7 +7,10 @@
   --accent-dark: #2563eb;
   --card-bg: #ffffff;
   --card-bg-dark: #1f2937;
-  --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+  --font-sans: "Inter", Arial, Helvetica, sans-serif;
+
+  /* Added */
+  --ring: rgba(96, 165, 250, 0.55); /* focus ring */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,14 +21,19 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
+  background: #000;
   color: var(--foreground);
   font-family: var(--font-sans);
   transition: background 0.3s, color 0.3s;
 }
 
-button, select {
+button,
+select {
   transition: all 0.2s;
 }
 
@@ -37,4 +45,123 @@ button, select {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* =========================================================
+   Premium micro-interactions (global)
+   Use via classNames:
+   - focus-ring (inputs/buttons)
+   - btn-glow (CTA buttons)
+   - card-lift hover-shine (cards)
+   - tap (mobile press)
+   - skeleton (loading blocks)
+   ========================================================= */
+
+/* Nice focus ring everywhere */
+.focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+}
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+/* Button glow (apply className="btn-glow") */
+.btn-glow {
+  position: relative;
+  transform: translateZ(0);
+}
+.btn-glow::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 16px;
+  background: radial-gradient(circle at 30% 30%, rgba(96, 165, 250, 0.35), transparent 55%),
+    radial-gradient(circle at 70% 70%, rgba(99, 102, 241, 0.25), transparent 55%);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  filter: blur(10px);
+}
+.btn-glow:hover::after {
+  opacity: 1;
+}
+
+/* Card lift (apply className="card-lift") */
+.card-lift {
+  transform: translateZ(0);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+}
+
+/* Subtle “shine” on hover (apply className="hover-shine") */
+.hover-shine {
+  position: relative;
+  overflow: hidden;
+}
+.hover-shine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 18%,
+    rgba(255, 255, 255, 0.1) 25%,
+    transparent 35%
+  );
+  transform: translateX(-120%);
+  transition: transform 450ms ease;
+  pointer-events: none;
+}
+.hover-shine:hover::before {
+  transform: translateX(120%);
+}
+
+/* Tap/press feel (apply className="tap") */
+.tap {
+  transform: translateZ(0);
+}
+.tap:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Skeleton shimmer (apply className="skeleton") */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 30%, transparent 60%);
+  transform: translateX(-120%);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .card-lift,
+  .hover-shine::before,
+  .btn-glow::after {
+    transition: none !important;
+  }
+  .skeleton::after {
+    animation: none !important;
+  }
 }

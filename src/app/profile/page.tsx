@@ -1,3 +1,4 @@
+// src/app/profile/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +14,10 @@ import {
   Copy,
   LogOut,
   ShieldCheck,
+  UploadCloud,
+  Star,
+  TrendingUp,
+  Music2,
 } from "lucide-react";
 
 function formatDate(iso?: string | null) {
@@ -25,19 +30,50 @@ function formatDate(iso?: string | null) {
   });
 }
 
+type RatingAgg = { sum: number; count: number };
+
+function badgeList(args: {
+  uploads: number;
+  totalDownloads: number;
+  avgRating: number | null;
+  totalRatings: number;
+}) {
+  const { uploads, totalDownloads, avgRating, totalRatings } = args;
+
+  const badges: { label: string; hint: string }[] = [];
+
+  if (uploads >= 10) badges.push({ label: "Prolific Uploader", hint: "10+ uploads" });
+  if (totalDownloads >= 250) badges.push({ label: "Trending", hint: "250+ total downloads" });
+  if (avgRating !== null && totalRatings >= 5 && avgRating >= 4.5)
+    badges.push({ label: "Top Rated", hint: "4.5+ avg (5+ ratings)" });
+
+  if (badges.length === 0) badges.push({ label: "New Creator", hint: "Just getting started" });
+
+  return badges.slice(0, 4);
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
   const [email, setEmail] = useState<string | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
-  // Provider (password/google/github etc)
   const [provider, setProvider] = useState<string>("unknown");
+
+  // Stats
+  const [totalUploads, setTotalUploads] = useState(0);
+  const [totalDownloads, setTotalDownloads] = useState(0);
+  const [overallAvg, setOverallAvg] = useState<number | null>(null);
+  const [totalRatings, setTotalRatings] = useState(0);
 
   // Password change form
   const [newPassword, setNewPassword] = useState("");
@@ -60,6 +96,17 @@ export default function ProfilePage() {
     return { label, score };
   }, [newPassword]);
 
+  const badges = useMemo(
+    () =>
+      badgeList({
+        uploads: totalUploads,
+        totalDownloads,
+        avgRating: overallAvg,
+        totalRatings,
+      }),
+    [totalUploads, totalDownloads, overallAvg, totalRatings]
+  );
+
   useEffect(() => {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
@@ -73,30 +120,69 @@ export default function ProfilePage() {
       setEmail(user.email ?? null);
       setMemberSince(user.created_at ?? null);
 
-      // provider extraction
-      // user.app_metadata.provider is common, but identities is safest
       const id0 = user.identities?.[0];
       const p = id0?.provider || (user.app_metadata as any)?.provider || "unknown";
       setProvider(p);
 
-      const { data, error } = await supabase
+      // Profile
+      const { data: prof, error: profErr } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, bio, avatar_url")
         .eq("id", user.id)
         .maybeSingle();
 
-      if (error) console.error("Profile fetch error:", error);
-      setUsername(data?.username ?? "");
+      if (profErr) console.error("Profile fetch error:", profErr);
+
+      setUsername(prof?.username ?? "");
+      setBio(prof?.bio ?? "");
+      setAvatarUrl(prof?.avatar_url ?? null);
+
+      // Upload stats
+      const { data: uploads, error: upErr } = await supabase
+        .from("music_files")
+        .select("id, downloads")
+        .eq("uploaded_by", user.id);
+
+      if (upErr) console.error("uploads stats error:", upErr);
+
+      const ids = (uploads ?? []).map((m: any) => m.id);
+      setTotalUploads(ids.length);
+      setTotalDownloads((uploads ?? []).reduce((sum: number, m: any) => sum + (m.downloads ?? 0), 0));
+
+      // Rating stats (bulk fetch)
+      let ratingMap = new Map<string, RatingAgg>();
+      if (ids.length > 0) {
+        const { data: ratingRows, error: rErr } = await supabase
+          .from("midi_ratings")
+          .select("midi_id, rating")
+          .in("midi_id", ids);
+
+        if (rErr) console.error("ratings stats error:", rErr);
+
+        for (const r of ratingRows ?? []) {
+          const prev = ratingMap.get(r.midi_id) ?? { sum: 0, count: 0 };
+          ratingMap.set(r.midi_id, { sum: prev.sum + (r.rating ?? 0), count: prev.count + 1 });
+        }
+      }
+
+      const totalR = Array.from(ratingMap.values()).reduce((sum, a) => sum + a.count, 0);
+      const sumStars = Array.from(ratingMap.values()).reduce((sum, a) => sum + a.sum, 0);
+      setTotalRatings(totalR);
+      setOverallAvg(totalR > 0 ? sumStars / totalR : null);
+
       setLoading(false);
     })();
   }, [router]);
 
   const saveProfile = async () => {
     const clean = username.trim();
+    const cleanBio = bio.trim();
+
     if (!clean) return alert("Username cannot be empty.");
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(clean)) {
       return alert("Username must be 3–20 chars and contain only letters, numbers, underscore.");
     }
+    if (cleanBio.length > 280) return alert("Bio is too long (max 280 characters).");
 
     setSavingProfile(true);
 
@@ -108,7 +194,10 @@ export default function ProfilePage() {
       return;
     }
 
-    const { error } = await supabase.from("profiles").update({ username: clean }).eq("id", user.id);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ username: clean, bio: cleanBio })
+      .eq("id", user.id);
 
     setSavingProfile(false);
 
@@ -119,6 +208,52 @@ export default function ProfilePage() {
     }
 
     alert("Profile updated!");
+  };
+
+  const uploadAvatar = async (file: File) => {
+    setUploadingAvatar(true);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (!user) {
+      setUploadingAvatar(false);
+      router.push("/login?redirect=/profile");
+      return;
+    }
+
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeExt = ["png", "jpg", "jpeg", "webp"].includes(ext) ? ext : "png";
+      const path = `${user.id}/avatar.${safeExt}`;
+
+      // overwrite by removing old (optional)
+      await supabase.storage.from("avatars").remove([path]);
+
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (upErr) throw upErr;
+
+      // public URL
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = pub.publicUrl;
+
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", user.id);
+
+      if (profErr) throw profErr;
+
+      setAvatarUrl(publicUrl);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Avatar upload failed.");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const changePassword = async () => {
@@ -172,12 +307,19 @@ export default function ProfilePage() {
         {/* Header card */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-400/20 flex items-center justify-center">
-                <User className="text-blue-300" size={18} />
+            <div className="flex items-start gap-4">
+              {/* Avatar */}
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-xl">👤</div>
+                )}
               </div>
+
               <div>
                 <h1 className="text-3xl font-extrabold">Profile</h1>
+
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="text-gray-300 text-sm">{email}</p>
                   <button
@@ -194,12 +336,27 @@ export default function ProfilePage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
                     <ShieldCheck size={14} className="text-green-300" />
-                    Member since <span className="text-gray-100 font-semibold">{formatDate(memberSince)}</span>
+                    Member since{" "}
+                    <span className="text-gray-100 font-semibold">{formatDate(memberSince)}</span>
                   </span>
 
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
                     Auth: <span className="text-gray-100 font-semibold">{provider}</span>
                   </span>
+                </div>
+
+                {/* Badges */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {badges.map((b) => (
+                    <span
+                      key={b.label}
+                      title={b.hint}
+                      className="px-3 py-1 rounded-full text-xs font-semibold
+                                 bg-white/5 border border-white/10 text-gray-200"
+                    >
+                      ✨ {b.label}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -214,15 +371,76 @@ export default function ProfilePage() {
               Sign out
             </button>
           </div>
+
+          {/* Stats */}
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+              <Music2 size={18} className="text-emerald-300" />
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Uploads</p>
+                <p className="text-lg font-semibold">{totalUploads}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+              <TrendingUp size={18} className="text-yellow-300" />
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Total downloads</p>
+                <p className="text-lg font-semibold">{totalDownloads}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+              <Star size={18} className="text-yellow-300" />
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Avg rating</p>
+                <p className="text-lg font-semibold">
+                  {overallAvg === null ? "—" : overallAvg.toFixed(1)}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+              <Star size={18} className="text-indigo-300" />
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Total ratings</p>
+                <p className="text-lg font-semibold">{totalRatings}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Username card */}
+        {/* Public profile card */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
           <h2 className="text-xl font-semibold mb-1">Public profile</h2>
           <p className="text-sm text-gray-400 mb-6">
-            This username is shown on your uploads and comments.
+            This username, bio, and avatar are shown on your uploads and comments.
           </p>
 
+          {/* Avatar uploader */}
+          <div className="mb-6">
+            <label className="block text-sm text-gray-300 mb-2">Avatar</label>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl
+                                 border border-white/10 bg-white/5 hover:bg-white/10 transition cursor-pointer">
+                <UploadCloud size={16} className="text-blue-300" />
+                {uploadingAvatar ? "Uploading..." : "Upload avatar"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadAvatar(f);
+                  }}
+                />
+              </label>
+
+              <p className="text-xs text-gray-500">PNG/JPG/WebP. Square works best.</p>
+            </div>
+          </div>
+
+          {/* Username */}
           <label className="block text-sm text-gray-300 mb-2">Username</label>
           <input
             value={username}
@@ -233,6 +451,18 @@ export default function ProfilePage() {
           />
           <p className="text-xs text-gray-500 mt-2">3–20 chars. Letters, numbers, underscore.</p>
 
+          {/* Bio */}
+          <label className="block text-sm text-gray-300 mb-2 mt-6">Bio</label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            rows={3}
+            className="w-full p-3 rounded-xl bg-gray-900/60 border border-white/10
+                       focus:outline-none focus:ring-2 focus:ring-blue-400/70"
+            placeholder="Tell people about yourself…"
+          />
+          <p className="text-xs text-gray-500 mt-2">{bio.trim().length}/280</p>
+
           <button
             onClick={saveProfile}
             disabled={savingProfile}
@@ -242,16 +472,14 @@ export default function ProfilePage() {
                        font-semibold shadow-lg transition disabled:opacity-50"
           >
             {savingProfile ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            Save username
+            Save profile
           </button>
         </div>
 
         {/* Password card */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
           <h2 className="text-xl font-semibold mb-1">Security</h2>
-          <p className="text-sm text-gray-400 mb-6">
-            Update your password to keep your account secure.
-          </p>
+          <p className="text-sm text-gray-400 mb-6">Update your password to keep your account secure.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -311,8 +539,8 @@ export default function ProfilePage() {
 
           {provider !== "email" && provider !== "unknown" && (
             <p className="mt-4 text-xs text-gray-500">
-              Note: You’re signed in with <span className="text-gray-200 font-semibold">{provider}</span>.
-              You can still set a password here if you want, but most people manage login through their provider.
+              Note: You’re signed in with <span className="text-gray-200 font-semibold">{provider}</span>. You can still set
+              a password here if you want.
             </p>
           )}
         </div>

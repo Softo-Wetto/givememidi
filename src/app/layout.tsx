@@ -2,6 +2,7 @@ import "./globals.css";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { AuthProvider } from "./components/AuthProvider";
+import { PageTransition } from "./components/PageTransition";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +10,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-black text-white">
         <AuthProvider>
           <Header />
-          {children}
+          <PageTransition>{children}</PageTransition>
           <Footer />
         </AuthProvider>
       </body>

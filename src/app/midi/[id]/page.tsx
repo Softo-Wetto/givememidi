@@ -5,6 +5,7 @@ import { PdfPreview } from "../../components/PdfPreview";
 import { MidiActions } from "../../components/MidiActions";
 import { CommentsSection } from "../../components/CommentsSection";
 import { RatingStars } from "../../components/RatingStars";
+import Link from "next/link";
 
 
 const supabase = createClient(
@@ -107,7 +108,12 @@ const { data, error } = await supabase
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
               <span>Uploaded by</span>
               <span className="font-semibold text-gray-200">
-                {data.uploader?.username ?? "Anonymous"}
+                <Link
+                  href={`/u/${data.uploader?.id}`}
+                  className="font-semibold text-gray-200 hover:text-blue-300 transition"
+                >
+                  {data.uploader?.username ?? "Anonymous"}
+                </Link>
               </span>
 
               <span className="text-gray-600">•</span>

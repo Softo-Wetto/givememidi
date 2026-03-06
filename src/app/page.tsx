@@ -34,29 +34,65 @@ async function fetchRatingAggForMidiIds(ids: string[]) {
   return map;
 }
 
+async function fetchTopRatedMidiIds(limit = 15, minRatings = 2) {
+  const { data, error } = await supabase
+    .from("midi_ratings")
+    .select("midi_id, rating");
+
+  if (error) {
+    console.error("top rated ratings fetch error:", error);
+    return [] as string[];
+  }
+
+  const map = new Map<string, { sum: number; count: number }>();
+
+  for (const r of data ?? []) {
+    const id = r.midi_id as string;
+    const prev = map.get(id) ?? { sum: 0, count: 0 };
+    map.set(id, { sum: prev.sum + (r.rating ?? 0), count: prev.count + 1 });
+  }
+
+  // sort by avg desc, then count desc
+  const sorted = Array.from(map.entries())
+    .map(([midiId, agg]) => ({ midiId, avg: agg.sum / agg.count, count: agg.count }))
+    .filter((x) => x.count >= minRatings)
+    .sort((a, b) => (b.avg - a.avg) || (b.count - a.count))
+    .slice(0, limit)
+    .map((x) => x.midiId);
+
+  return sorted;
+}
+
 export default async function Home() {
-  // ✅ QoL: multiple sections so the homepage scales as you get more content
-  const [{ data: popularMidis }, { data: latestMidis }, { data: pdfMidis }] =
-    await Promise.all([
-      supabase
-        .from("music_files")
-        .select("*")
-        .order("downloads", { ascending: false })
-        .limit(15),
+  const topRatedIdsPromise = fetchTopRatedMidiIds(15, 2);
 
-      supabase
-        .from("music_files")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(15),
+  const [
+    { data: popularMidis },
+    { data: latestMidis },
+    { data: pdfMidis },
+    topRatedIds,
+  ] = await Promise.all([
+    supabase.from("music_files").select("*").order("downloads", { ascending: false }).limit(15),
+    supabase.from("music_files").select("*").order("created_at", { ascending: false }).limit(15),
+    supabase.from("music_files").select("*").not("pdf_url", "is", null).order("created_at", { ascending: false }).limit(15),
+    topRatedIdsPromise,
+  ]);
 
-      supabase
-        .from("music_files")
-        .select("*")
-        .not("pdf_url", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(15),
-    ]);
+  const { data: topRatedMidis, error: topRatedErr } =
+    topRatedIds.length > 0
+      ? await supabase
+          .from("music_files")
+          .select("*")
+          .in("id", topRatedIds)
+      : { data: [], error: null };
+
+  if (topRatedErr) console.error("topRatedMidis fetch error:", topRatedErr);
+
+  // keep order same as topRatedIds
+  const topRatedOrdered =
+    (topRatedMidis ?? []).slice().sort(
+      (a: any, b: any) => topRatedIds.indexOf(a.id) - topRatedIds.indexOf(b.id)
+    );
 
     // Build a unique list of IDs shown on the homepage (popular + latest + pdf)
     const allIds = Array.from(
@@ -64,6 +100,7 @@ export default async function Home() {
         ...(popularMidis ?? []).map((m: any) => m.id),
         ...(latestMidis ?? []).map((m: any) => m.id),
         ...(pdfMidis ?? []).map((m: any) => m.id),
+        ...(topRatedOrdered ?? []).map((m: any) => m.id),
       ])
     );
 
@@ -78,6 +115,7 @@ export default async function Home() {
   const hasPopular = (popularMidis?.length ?? 0) > 0;
   const hasLatest = (latestMidis?.length ?? 0) > 0;
   const hasPdf = (pdfMidis?.length ?? 0) > 0;
+  const hasTopRated = (topRatedOrdered?.length ?? 0) > 0;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
@@ -222,6 +260,41 @@ export default async function Home() {
             subtitle="Be the first to upload a MIDI file."
             ctaHref="/upload"
             ctaLabel="Upload MIDI"
+          />
+        )}
+
+        {/* TOP RATED */}
+        <SectionHeader
+          title="🏆 Highest Rated"
+          subtitle="Top-rated MIDI files (by average rating)."
+          href="/midi"
+          linkLabel="View all"
+        />
+
+        {hasTopRated ? (
+          <MidiRowScroller itemCount={topRatedOrdered!.length}>
+            {topRatedOrdered!.map((midi: any) => {
+              const { avgRating, ratingCount } = getAvg(midi.id);
+
+              return (
+                <div key={midi.id} className="snap-start shrink-0 w-[280px] sm:w-[320px]">
+                  <MidiCard
+                    id={midi.id}
+                    title={midi.title}
+                    composer={midi.composer}
+                    downloads={midi.downloads}
+                    pdfUrl={midi.pdf_url || null}
+                    avgRating={avgRating}
+                    ratingCount={ratingCount}
+                  />
+                </div>
+              );
+            })}
+          </MidiRowScroller>
+        ) : (
+          <EmptyState
+            title="No rated files yet"
+            subtitle="Once people start rating uploads, the top-rated files will show up here."
           />
         )}
 

@@ -24,7 +24,7 @@ export function Footer() {
   const accountLabel = user ? "Profile" : "Log in";
 
   return (
-    <footer className="mt-24 border-t border-white/10 bg-gradient-to-b from-black via-gray-950 to-black text-gray-300">
+    <footer className="border-t border-white/10 bg-gradient-to-b from-black to-gray-950 text-gray-300">
       {/* top glow line */}
       <div className="pointer-events-none relative">
         <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
@@ -105,6 +105,7 @@ export function Footer() {
             <p className="text-sm font-semibold text-white">Explore</p>
             <ul className="space-y-2 text-sm">
               <FooterLink href="/midi" label="All MIDI" />
+              <FooterLink href="/creators" label="Top Creators" />
               <FooterLink href="/bookmarks" label="Bookmarks" />
               <FooterLink href="/upload" label="Upload" />
               <FooterLink href="/myuploads" label="My uploads" />

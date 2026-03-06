@@ -12,6 +12,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tonejs/midi": "^2.0.28",
+    "framer-motion": "^12.35.0",
     "lucide-react": "^0.562.0",
     "next": "^16.1.4",
     "pdfjs-dist": "^5.4.449",
