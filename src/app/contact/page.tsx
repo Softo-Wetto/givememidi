@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase } from "../../lib/supbaseClient"; // ✅ use your existing client
+import { pocketbase } from "../../lib/pocketbaseClient";
 import { Mail, MessageSquare, Send, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function ContactPage() {
@@ -38,7 +38,7 @@ export default function ContactPage() {
 
     setSending(true);
 
-    const { error } = await supabase.from("contact_messages").insert({
+    const { error } = await pocketbase.from("contact_messages").insert({
       email: email.trim(),
       subject: subject.trim() ? subject.trim() : null,
       message: message.trim(),

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark } from "lucide-react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 
 type BookmarkRow = { id: string };
 
@@ -21,7 +21,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
     let cancelled = false;
 
     (async () => {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await pocketbase.auth.getUser();
       if (error) console.error("getUser error:", error);
 
       if (!cancelled) {
@@ -44,7 +44,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
     (async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await pocketbase
           .from("bookmarks")
           .select("id")
           .eq("user_id", userId)
@@ -79,7 +79,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
       setLoading(true);
 
       if (bookmarked) {
-        const { error } = await supabase
+        const { error } = await pocketbase
           .from("bookmarks")
           .delete()
           .eq("user_id", userId)
@@ -92,7 +92,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
 
         setBookmarked(false);
       } else {
-        const { error } = await supabase.from("bookmarks").insert({
+        const { error } = await pocketbase.from("bookmarks").insert({
           user_id: userId,
           midi_id: midiId,
         });

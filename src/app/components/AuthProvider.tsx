@@ -2,8 +2,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supbaseClient";
+type User = { id: string; email?: string | null; user_metadata?: Record<string, unknown> };
+import { pocketbase } from "../../lib/pocketbaseClient";
 
 type AuthCtx = { user: User | null; loading: boolean };
 const AuthContext = createContext<AuthCtx>({ user: null, loading: true });
@@ -15,19 +15,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    pocketbase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+    const { data: sub } = pocketbase.auth.onAuthStateChange((_evt, session) => {
       setUser(session?.user ?? null);
     });
 
     // optional: resync on tab focus (fixes “stale auth” cases)
     const onFocus = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await pocketbase.auth.getSession();
       setUser(data.session?.user ?? null);
     };
     window.addEventListener("focus", onFocus);

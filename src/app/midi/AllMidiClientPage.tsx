@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MidiCard } from "../components/MidiCard";
-import { Search, SlidersHorizontal, ArrowUpDown, X, Loader } from "lucide-react";
+import { ArrowUpDown, Loader, Music2, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 
 type SortKey = "newest" | "downloads" | "title";
 const PAGE_SIZE = 9;
@@ -31,12 +31,9 @@ export default function AllMidiClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Create supabase client ONLY on client side
-  const supabase = useMemo(() => {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+  // Create pocketbase client ONLY on client side
+  const pocketbase = useMemo(() => {
+    return createPocketBaseClient();
   }, []);
 
   // URL -> state
@@ -61,7 +58,7 @@ export default function AllMidiClientPage() {
   async function fetchRatingAggForMidiIds(ids: string[]) {
     if (ids.length === 0) return new Map<string, RatingAgg>();
 
-    const { data, error } = await supabase
+    const { data, error } = await pocketbase
       .from("midi_ratings")
       .select("midi_id, rating")
       .in("midi_id", ids);
@@ -112,7 +109,7 @@ export default function AllMidiClientPage() {
   // Fetch genres once
   useEffect(() => {
     const fetchGenres = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await pocketbase
         .from("music_files")
         .select("genre")
         .not("genre", "is", null);
@@ -129,7 +126,7 @@ export default function AllMidiClientPage() {
       }
     };
     fetchGenres();
-  }, [supabase]);
+  }, [pocketbase]);
 
   const applySort = (query: any) => {
     if (sort === "newest") return query.order("created_at", { ascending: false });
@@ -138,7 +135,7 @@ export default function AllMidiClientPage() {
   };
 
   const buildQuery = () => {
-    let query = supabase
+    let query = pocketbase
       .from("music_files")
       .select("id,title,composer,downloads,pdf_url,created_at,genre,bpm");
 
@@ -232,6 +229,8 @@ export default function AllMidiClientPage() {
     return `${midis.length} result${midis.length === 1 ? "" : "s"}`;
   }, [loading, midis.length]);
 
+  const popularGenres = useMemo(() => genres.slice(0, 8), [genres]);
+
   const clearFilters = () => {
     setSearch("");
     setGenre("");
@@ -265,23 +264,47 @@ export default function AllMidiClientPage() {
   }, [search, genre, sort]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
       <div className="max-w-7xl mx-auto px-6 pt-10 pb-20">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-6">
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight">All MIDI Files</h1>
-            <p className="text-gray-400 mt-2">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.055] px-4 py-2 text-sm text-blue-100">
+              <Sparkles size={16} className="text-cyan-300" />
+              Browse, filter, preview, collect.
+            </div>
+            <h1 className="text-4xl font-black tracking-tight md:text-5xl">All MIDI files</h1>
+            <p className="text-gray-400 mt-3 max-w-2xl">
               Search by title, composer, or genre. Filter, sort, and scroll to load more.
             </p>
           </div>
 
           <div className="text-sm text-gray-400">
-            <span className="px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3">
+              <Music2 size={16} className="text-cyan-300" />
               {resultsLabel}
             </span>
           </div>
         </div>
+
+        {popularGenres.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {popularGenres.map((item) => (
+              <button
+                key={item}
+                onClick={() => setGenre(item)}
+                className={`tap rounded-full border px-3 py-1.5 text-sm transition ${
+                  genre === item
+                    ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                    : "border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-300/35 hover:bg-cyan-300/10"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Chips */}
         {chips.length > 0 && (
@@ -313,10 +336,10 @@ export default function AllMidiClientPage() {
 
         {/* Filters (sticky) */}
         <div className="sticky top-[72px] z-40 mb-8">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-xl">
+          <div className="rounded-3xl border border-white/10 bg-black/50 p-4 shadow-xl shadow-black/30 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row gap-3 md:items-center">
               {/* Search */}
-              <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-blue-400">
+              <div className="flex-1 flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5 transition focus-within:border-cyan-300/50 focus-within:ring-2 focus-within:ring-cyan-300/30">
                 <Search size={16} className="text-gray-400" />
                 <input
                   placeholder="Search title, composer, or genre…"
@@ -336,7 +359,7 @@ export default function AllMidiClientPage() {
               </div>
 
               {/* Genre */}
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5">
                 <SlidersHorizontal size={16} className="text-gray-400" />
                 <select
                   className="bg-transparent outline-none text-white w-full md:w-52"
@@ -353,7 +376,7 @@ export default function AllMidiClientPage() {
               </div>
 
               {/* Sort */}
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5">
                 <ArrowUpDown size={16} className="text-gray-400" />
                 <select
                   className="bg-transparent outline-none text-white w-full md:w-48"
@@ -368,7 +391,7 @@ export default function AllMidiClientPage() {
 
               <button
                 onClick={clearFilters}
-                className="md:ml-auto px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition"
+                className="tap md:ml-auto px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.055] hover:bg-white/10 transition"
               >
                 Reset
               </button>
@@ -380,10 +403,7 @@ export default function AllMidiClientPage() {
         {loading && (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-white/10 bg-white/5 p-4 animate-pulse"
-              >
+              <div key={i} className="skeleton h-[356px] rounded-2xl p-4">
                 <div className="h-48 rounded-lg bg-white/10 mb-4" />
                 <div className="h-5 bg-white/10 rounded w-3/4 mb-2" />
                 <div className="h-4 bg-white/10 rounded w-1/2" />
@@ -393,12 +413,12 @@ export default function AllMidiClientPage() {
         )}
 
         {!loading && midis.length === 0 && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-10 text-center">
             <p className="text-xl font-semibold">No results</p>
             <p className="text-gray-400 mt-2">Try changing your search or filters.</p>
             <button
               onClick={clearFilters}
-              className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 font-semibold shadow-lg transition"
+              className="btn-glow mt-6 px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 font-bold shadow-lg transition hover:brightness-110"
             >
               Clear filters
             </button>
@@ -416,6 +436,8 @@ export default function AllMidiClientPage() {
                   composer={midi.composer || ""}
                   downloads={midi.downloads ?? 0}
                   pdfUrl={midi.pdf_url || null}
+                  genre={midi.genre}
+                  bpm={midi.bpm}
                   avgRating={midi.avgRating}
                   ratingCount={midi.ratingCount}
                 />
@@ -435,7 +457,7 @@ export default function AllMidiClientPage() {
               <div className="flex justify-center mt-10">
                 <button
                   onClick={fetchMore}
-                  className="px-6 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition"
+                  className="tap px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.055] hover:bg-white/10 transition"
                 >
                   Load more
                 </button>

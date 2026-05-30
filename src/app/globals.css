@@ -145,6 +145,23 @@ select {
   transform: translateX(-120%);
   animation: shimmer 1.2s infinite;
 }
+
+.motion-bar {
+  transform-origin: bottom;
+  animation: midi-bar 1.8s ease-in-out infinite;
+}
+
+@keyframes midi-bar {
+  0%,
+  100% {
+    transform: scaleY(0.62);
+    opacity: 0.68;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
 @keyframes shimmer {
   100% {
     transform: translateX(120%);
@@ -162,6 +179,9 @@ select {
     transition: none !important;
   }
   .skeleton::after {
+    animation: none !important;
+  }
+  .motion-bar {
     animation: none !important;
   }
 }

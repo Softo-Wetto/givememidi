@@ -1,13 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { Music2, FileMusic, FileText, Info, Loader2 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createRecord, getCurrentAuth, updateRecord } from "@/lib/pocketbase/client";
+import { getPocketBaseFileUrl } from "@/lib/pocketbase/config";
+import type { MusicFile } from "@/lib/pocketbase/types";
 
 export default function UploadClient() {
   const [title, setTitle] = useState("");
@@ -104,6 +101,7 @@ export default function UploadClient() {
   );
 
   const canSubmit = title.trim().length > 0 && !!midi && !loading;
+  const completion = [title.trim(), composer.trim(), genre, bpm !== "", midi, pdf].filter(Boolean).length;
 
   const upload = async () => {
     if (!midi || !title.trim()) {
@@ -114,49 +112,36 @@ export default function UploadClient() {
     setLoading(true);
 
     try {
-      // --- MIDI Upload ---
-      const midiSafe = midi.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const midiPath = `${crypto.randomUUID()}-${midiSafe}`;
-
-      const { error: midiError } = await supabase.storage
-        .from("midis")
-        .upload(midiPath, midi);
-
-      if (midiError) throw midiError;
-
-      // --- PDF Upload (optional) ---
-      let pdfPath: string | null = null;
-
-      if (pdf) {
-        const pdfSafe = pdf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        pdfPath = `${crypto.randomUUID()}-${pdfSafe}`;
-
-        const { error: pdfError } = await supabase.storage
-          .from("pdfs")
-          .upload(pdfPath, pdf);
-
-        if (pdfError) throw pdfError;
-      }
-
-      // --- Insert into DB ---
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
+      const auth = getCurrentAuth();
+      if (!auth?.user.id) {
         alert("Please log in to upload.");
         window.location.href = "/login?redirect=/upload";
         return;
       }
 
-      const { error } = await supabase.from("music_files").insert({
-        title,
-        composer: composer || null,
-        genre: genre || null,
-        bpm: bpm === "" ? null : bpm,
-        midi_url: midiPath,
-        pdf_url: pdfPath,
-        uploaded_by: userData.user.id,
-      });
+      const form = new FormData();
+      form.append("title", title);
+      form.append("composer", composer || "");
+      form.append("genre", genre || "");
+      if (bpm !== "") form.append("bpm", String(bpm));
+      form.append("downloads", "0");
+      form.append("uploaded_by", auth.user.id);
+      form.append("midi_file", midi);
+      form.append("created_at", new Date().toISOString());
+      form.append("updated_at", new Date().toISOString());
+      if (pdf) form.append("pdf_file", pdf);
 
-      if (error) throw error;
+      const created = await createRecord<MusicFile>("music_files", form);
+      const midiUrl = getPocketBaseFileUrl("music_files", created.id, created.midi_file);
+      const pdfUrl = getPocketBaseFileUrl("music_files", created.id, created.pdf_file);
+
+      if (midiUrl || pdfUrl) {
+        // Keep the old text fields populated so legacy UI paths can keep using them.
+        const updateForm = new FormData();
+        if (midiUrl) updateForm.append("midi_url", midiUrl);
+        if (pdfUrl) updateForm.append("pdf_url", pdfUrl);
+        await updateRecord("music_files", created.id, updateForm);
+      }
 
       alert("Upload successful!");
       setTitle("");
@@ -174,7 +159,7 @@ export default function UploadClient() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       {/* subtle glow */}
       <div className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 left-1/4 h-[420px] w-[420px] rounded-full bg-indigo-500/20 blur-3xl" />
@@ -201,7 +186,19 @@ export default function UploadClient() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Main form */}
-          <div className="lg:col-span-3 bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
+          <div className="lg:col-span-3 bg-white/[0.055] border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
+            <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-200">Upload readiness</span>
+                <span className="text-slate-400">{completion}/6</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300 transition-all"
+                  style={{ width: `${Math.max(8, (completion / 6) * 100)}%` }}
+                />
+              </div>
+            </div>
             {/* Metadata */}
             <div className="flex items-center gap-2 text-sm text-gray-300 mb-4">
               <Info size={16} className="text-gray-400" />
@@ -279,7 +276,15 @@ export default function UploadClient() {
               </div>
 
               {/* MIDI */}
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setMidi(file);
+                }}
+                className="rounded-2xl border border-dashed border-blue-300/30 bg-blue-400/5 p-5 transition hover:border-blue-300/50 hover:bg-blue-400/10"
+              >
                 <label className="block text-sm font-medium mb-2">
                   🎵 MIDI File <span className="text-red-400">*</span>
                 </label>
@@ -310,7 +315,15 @@ export default function UploadClient() {
               </div>
 
               {/* PDF */}
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setPdf(file);
+                }}
+                className="rounded-2xl border border-dashed border-emerald-300/30 bg-emerald-400/5 p-5 transition hover:border-emerald-300/50 hover:bg-emerald-400/10"
+              >
                 <label className="block text-sm font-medium mb-2">
                   📄 Sheet Music PDF <span className="text-gray-400">(optional)</span>
                 </label>

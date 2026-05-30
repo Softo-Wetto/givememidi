@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "../../../../lib/supbaseClient";
+import { pocketbase } from "../../../../lib/pocketbaseClient";
+import { updateRecord } from "../../../../lib/pocketbase/client";
+import { getPocketBaseFileUrl } from "../../../../lib/pocketbase/config";
 import {
   ArrowLeft,
   FileMusic,
@@ -23,6 +25,8 @@ type MusicFileRow = {
   bpm: number | null;
   midi_url: string;
   pdf_url: string | null;
+  midi_file?: string | null;
+  pdf_file?: string | null;
   uploaded_by: string | null;
 };
 
@@ -128,7 +132,7 @@ export default function EditMidiPage() {
     const init = async () => {
       setLoading(true);
 
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await pocketbase.auth.getUser();
       const uid = userData.user?.id ?? null;
 
       if (!uid) {
@@ -137,11 +141,11 @@ export default function EditMidiPage() {
       }
       setUserId(uid);
 
-      const { data, error } = await supabase
+      const { data, error } = await pocketbase
         .from("music_files")
-        .select("id, title, composer, genre, bpm, midi_url, pdf_url, uploaded_by")
+        .select<MusicFileRow>("id, title, composer, genre, bpm, midi_url, pdf_url, uploaded_by")
         .eq("id", id)
-        .single();
+        .single<MusicFileRow>();
 
       if (error || !data) {
         console.error("Edit fetch error:", error);
@@ -172,20 +176,6 @@ export default function EditMidiPage() {
 
   const canSave = !!row && title.trim().length > 0 && !saving && !loading;
 
-  async function uploadReplacement(
-    bucket: "midis" | "pdfs",
-    file: File,
-    uid: string
-  ) {
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${uid}/${crypto.randomUUID()}-${safe}`;
-    const res = await supabase.storage.from(bucket).upload(path, file, {
-      upsert: false,
-    });
-    if (res.error) throw res.error;
-    return path;
-  }
-
   const save = async () => {
     if (!row || !userId) return;
     if (!title.trim()) {
@@ -196,52 +186,51 @@ export default function EditMidiPage() {
     setSaving(true);
 
     try {
-      // 1) (optional) upload new midi/pdf first
-      let nextMidiUrl = row.midi_url;
-      let nextPdfUrl = row.pdf_url;
+      const updates = {
+        title: title.trim(),
+        composer: composer.trim() ? composer.trim() : null,
+        genre: genre || null,
+        bpm: bpm === "" ? null : bpm,
+      };
 
-      if (newMidi) {
-        const uploadedPath = await uploadReplacement("midis", newMidi, userId);
-        nextMidiUrl = uploadedPath;
+      const fileUpdate = newMidi || newPdf;
+      let updatedRecord: MusicFileRow;
+
+      if (fileUpdate) {
+        const form = new FormData();
+        form.set("title", updates.title);
+        form.set("composer", updates.composer ?? "");
+        form.set("genre", updates.genre ?? "");
+        form.set("bpm", updates.bpm === null ? "" : String(updates.bpm));
+        if (newMidi) form.set("midi_file", newMidi);
+        if (newPdf) form.set("pdf_file", newPdf);
+        updatedRecord = await updateRecord<MusicFileRow>("music_files", row.id, form);
+      } else {
+        updatedRecord = await updateRecord<MusicFileRow>("music_files", row.id, updates);
       }
 
-      if (newPdf) {
-        const uploadedPath = await uploadReplacement("pdfs", newPdf, userId);
-        nextPdfUrl = uploadedPath;
-      }
+      const nextMidiUrl =
+        getPocketBaseFileUrl("music_files", updatedRecord.id, updatedRecord.midi_file) ??
+        updatedRecord.midi_url ??
+        row.midi_url;
+      const nextPdfUrl =
+        getPocketBaseFileUrl("music_files", updatedRecord.id, updatedRecord.pdf_file) ??
+        updatedRecord.pdf_url ??
+        row.pdf_url;
 
-      // 2) update DB
-      const { error } = await supabase
-        .from("music_files")
-        .update({
-          title: title.trim(),
-          composer: composer.trim() ? composer.trim() : null,
-          genre: genre || null,
-          bpm: bpm === "" ? null : bpm,
+      if (fileUpdate) {
+        await updateRecord<MusicFileRow>("music_files", row.id, {
           midi_url: nextMidiUrl,
           pdf_url: nextPdfUrl,
-        })
-        .eq("id", row.id);
-
-      if (error) throw error;
-
-      // 3) cleanup old files (best-effort) if replacements happened
-      if (newMidi && row.midi_url && row.midi_url !== nextMidiUrl) {
-        const r = await supabase.storage.from("midis").remove([row.midi_url]);
-        if (r.error) console.warn("Old MIDI remove warning:", r.error);
-      }
-      if (newPdf && row.pdf_url && row.pdf_url !== nextPdfUrl) {
-        const r = await supabase.storage.from("pdfs").remove([row.pdf_url]);
-        if (r.error) console.warn("Old PDF remove warning:", r.error);
+        });
       }
 
       // update local
       const updated: MusicFileRow = {
         ...row,
-        title: title.trim(),
-        composer: composer.trim() ? composer.trim() : null,
-        genre: genre || null,
-        bpm: bpm === "" ? null : bpm,
+        ...updates,
+        midi_file: updatedRecord.midi_file,
+        pdf_file: updatedRecord.pdf_file,
         midi_url: nextMidiUrl,
         pdf_url: nextPdfUrl,
       };
@@ -267,21 +256,8 @@ export default function EditMidiPage() {
     setDeleting(true);
 
     try {
-      const midiPath = row.midi_url;
-      const pdfPath = row.pdf_url;
-
-      const { error } = await supabase.from("music_files").delete().eq("id", row.id);
+      const { error } = await pocketbase.from("music_files").delete().eq("id", row.id);
       if (error) throw error;
-
-      // best-effort storage cleanup
-      if (midiPath) {
-        const r = await supabase.storage.from("midis").remove([midiPath]);
-        if (r.error) console.warn("MIDI remove warning:", r.error);
-      }
-      if (pdfPath) {
-        const r = await supabase.storage.from("pdfs").remove([pdfPath]);
-        if (r.error) console.warn("PDF remove warning:", r.error);
-      }
 
       alert("Deleted.");
       router.push("/uploads");

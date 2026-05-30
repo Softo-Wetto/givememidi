@@ -1,29 +1,40 @@
-import { createClient } from "@supabase/supabase-js";
+import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import { notFound } from "next/navigation";
 import { MidiPreview } from "../../components/MidiPreview";
 import { PdfPreview } from "../../components/PdfPreview";
 import { MidiActions } from "../../components/MidiActions";
 import { CommentsSection } from "../../components/CommentsSection";
 import { RatingStars } from "../../components/RatingStars";
+import { ShareButton } from "../../components/ShareButton";
+import { MidiCard } from "../../components/MidiCard";
 import Link from "next/link";
 
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const pocketbase = createPocketBaseClient();
 
 type Props = { params: { id: string } | Promise<{ id: string }> };
 type RatingAgg = { avg: number | null; count: number };
+type MidiRow = {
+  id: string;
+  title: string;
+  composer: string | null;
+  genre: string | null;
+  bpm: number | null;
+  midi_url: string;
+  pdf_url: string | null;
+  downloads: number | null;
+  created_at: string | null;
+  uploader?: { id: string; username: string | null } | null;
+};
 
 
 export default async function MidiDetail({ params }: Props) {
   // ✅ works in both Next “params sync” and “params async” modes
   const { id } = await Promise.resolve(params);
 
-const { data, error } = await supabase
+const { data, error } = await pocketbase
   .from("music_files")
-  .select(`
+  .select<MidiRow>(`
     *,
     uploader:profiles (
       id,
@@ -31,7 +42,7 @@ const { data, error } = await supabase
     )
   `)
   .eq("id", id)
-  .single();
+  .single<MidiRow>();
 
  if (error) {
     console.error("music_files fetch error:", error);
@@ -40,7 +51,7 @@ const { data, error } = await supabase
   if (!data) return notFound();
 
   // Rating stats (avg + count)
-  const { data: ratingRows, error: ratingErr } = await supabase
+  const { data: ratingRows, error: ratingErr } = await pocketbase
     .from("midi_ratings")
     .select("rating")
     .eq("midi_id", data.id);
@@ -56,33 +67,32 @@ const { data, error } = await supabase
   const ratingAgg: RatingAgg = { avg, count };
 
   // increment download count (you may want to move this to a "download click" later)
-  await supabase
+  await pocketbase
     .from("music_files")
     .update({ downloads: (data.downloads ?? 0) + 1 })
     .eq("id", id);
 
-  const midiRes = await supabase.storage
-    .from("midis")
-    .createSignedUrl(data.midi_url, 60);
+  const midiSigned = data.midi_url;
+  const pdfSigned = data.pdf_url || null;
+  const { data: relatedRows, error: relatedErr } = data.genre
+    ? await pocketbase
+        .from("music_files")
+        .select<MidiRow>("id,title,composer,downloads,pdf_url,genre,bpm")
+        .eq("genre", data.genre)
+        .neq("id", data.id)
+        .limit(4)
+    : { data: [], error: null };
 
-  if (!midiRes.data) return notFound();
-
-  let pdfSigned: string | null = null;
-  if (data.pdf_url) {
-    const pdfRes = await supabase.storage
-      .from("pdfs")
-      .createSignedUrl(data.pdf_url, 60);
-    pdfSigned = pdfRes.data?.signedUrl || null;
-  }
+  if (relatedErr) console.error("related MIDI fetch error:", relatedErr);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-72 w-[900px] rounded-full bg-blue-500/10 blur-3xl" />
       </div>
 
       <div className="relative max-w-6xl mx-auto px-6 py-10 space-y-10">
-        <section className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
+        <section className="hover-shine bg-white/[0.055] border border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
@@ -153,7 +163,10 @@ const { data, error } = await supabase
             </div>
 
             <div className="flex items-center justify-center lg:justify-end">
-              <MidiActions midiId={data.id} />
+              <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-end">
+                <MidiActions midiId={data.id} />
+                <ShareButton label="Share MIDI" text={data.title} />
+              </div>
             </div>
           </div>
 
@@ -166,7 +179,7 @@ const { data, error } = await supabase
 
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <a
-              href={midiRes.data.signedUrl}
+              href={midiSigned}
               download={`${data.title}.mid`}
               className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl
                          bg-gradient-to-r from-blue-500 to-indigo-500
@@ -194,13 +207,18 @@ const { data, error } = await supabase
               </div>
             )}
           </div>
+
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+            <span className="font-semibold text-white">Quick tip:</span>{" "}
+            Use the preview before downloading, then bookmark the file if it belongs in your reference library.
+          </div>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-3 space-y-8">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-xl">
               <h2 className="text-xl font-semibold mb-4">MIDI Preview</h2>
-              <MidiPreview url={midiRes.data.signedUrl} />
+              <MidiPreview url={midiSigned} />
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-xl">
@@ -221,6 +239,34 @@ const { data, error } = await supabase
             <CommentsSection midiId={data.id} />
           </div>
         </section>
+
+        {(relatedRows?.length ?? 0) > 0 ? (
+          <section className="space-y-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black">More in {data.genre}</h2>
+                <p className="text-sm text-slate-400">Similar uploads you might want to preview next.</p>
+              </div>
+              <Link href={`/midi?genre=${encodeURIComponent(data.genre || "")}`} className="text-sm font-bold text-cyan-200 hover:text-white">
+                View genre →
+              </Link>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {(relatedRows ?? []).map((midi: any) => (
+                <MidiCard
+                  key={midi.id}
+                  id={midi.id}
+                  title={midi.title}
+                  composer={midi.composer}
+                  downloads={midi.downloads}
+                  pdfUrl={midi.pdf_url}
+                  genre={midi.genre}
+                  bpm={midi.bpm}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

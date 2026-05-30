@@ -61,7 +61,7 @@ export default function AboutPage() {
 
           {/* Stats */}
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Stat title="Fast downloads" value="Signed URLs" desc="Secure file access via Supabase Storage" />
+            <Stat title="Fast downloads" value="Direct links" desc="Secure file access via PocketBase storage" />
             <Stat title="Optional sheet music" value="PDF support" desc="MIDI + score, all in one entry" />
             <Stat title="Save favorites" value="Bookmarks" desc="Only for logged-in users" />
           </div>
@@ -107,7 +107,7 @@ export default function AboutPage() {
             <div>
               <h2 className="text-2xl md:text-3xl font-bold">How it works</h2>
               <p className="mt-2 text-gray-300 max-w-2xl">
-                GiveMeMIDI uses Supabase for authentication and storage. Files live in buckets
+                GiveMeMIDI uses PocketBase for authentication, database records, and storage. Files live with their MIDI records
                 and are served via short-lived signed URLs for secure access.
               </p>
             </div>
@@ -132,7 +132,7 @@ export default function AboutPage() {
           />
           <Faq
             q="Does SSO (Google/GitHub) work?"
-            a="Yes, if enabled in Supabase Auth Providers. SSO creates a Supabase user automatically, same as email/password."
+            a="Email/password login is enabled. Social login can be added later if PocketBase OAuth providers are configured."
           />
           <Faq
             q="Why are downloads secure?"

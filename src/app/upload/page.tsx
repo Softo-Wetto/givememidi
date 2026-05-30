@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import UploadClient from "./UploadClient";
-import { supabaseServer } from "../../lib/server";
+import { pocketbaseServer } from "../../lib/server";
 
 export default async function UploadPage() {
-  const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser();
+  const pocketbase = await pocketbaseServer();
+  const { data } = await pocketbase.auth.getUser();
 
   if (!data.user) {
     redirect("/login?redirect=/upload");

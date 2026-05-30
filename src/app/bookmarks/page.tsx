@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -52,7 +52,7 @@ type RatingAgg = { sum: number; count: number };
 async function fetchRatingAggForMidiIds(ids: string[]) {
   if (ids.length === 0) return new Map<string, RatingAgg>();
 
-  const { data, error } = await supabase
+  const { data, error } = await pocketbase
     .from("midi_ratings")
     .select("midi_id, rating")
     .in("midi_id", ids);
@@ -107,6 +107,7 @@ export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState<BookmarkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"recent" | "title" | "composer">("recent");
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const [ratingMap, setRatingMap] = useState<Map<string, RatingAgg>>(new Map());
@@ -120,7 +121,7 @@ export default function BookmarksPage() {
   const fetchBookmarks = async () => {
     setLoading(true);
 
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    const { data: userData, error: userErr } = await pocketbase.auth.getUser();
     if (userErr) console.error("getUser error:", userErr);
 
     if (!userData?.user) {
@@ -128,9 +129,9 @@ export default function BookmarksPage() {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await pocketbase
       .from("bookmarks")
-      .select(
+      .select<BookmarkDbRow>(
         `
         id,
         created_at,
@@ -187,17 +188,24 @@ export default function BookmarksPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return bookmarks;
-    return bookmarks.filter((b) => {
+    const source = q
+      ? bookmarks.filter((b) => {
       const t = (b.midi.title || "").toLowerCase();
       const c = (b.midi.composer || "").toLowerCase();
       return t.includes(q) || c.includes(q);
+    })
+      : bookmarks;
+
+    return source.slice().sort((a, b) => {
+      if (sort === "title") return a.midi.title.localeCompare(b.midi.title);
+      if (sort === "composer") return (a.midi.composer || "").localeCompare(b.midi.composer || "");
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
-  }, [bookmarks, query]);
+  }, [bookmarks, query, sort]);
 
   const removeBookmark = async (bookmarkId: string) => {
     setRemovingId(bookmarkId);
-    const { error } = await supabase.from("bookmarks").delete().eq("id", bookmarkId);
+    const { error } = await pocketbase.from("bookmarks").delete().eq("id", bookmarkId);
     setRemovingId(null);
 
     if (error) {
@@ -233,7 +241,7 @@ useEffect(() => {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <div className="max-w-7xl mx-auto px-6 pt-10 pb-20">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-6">
@@ -248,7 +256,7 @@ useEffect(() => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300">
+            <div className="px-3 py-2 rounded-xl bg-white/[0.055] border border-white/10 text-sm text-gray-300">
               {bookmarks.length} saved
             </div>
 
@@ -265,8 +273,8 @@ useEffect(() => {
         </div>
 
         {/* Search bar */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-blue-400">
+        <div className="mb-8 grid gap-3 md:grid-cols-[1fr_220px]">
+          <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-cyan-300/30">
             <Search size={16} className="text-gray-400" />
             <input
               value={query}
@@ -275,11 +283,20 @@ useEffect(() => {
               className="w-full bg-transparent outline-none text-white placeholder:text-gray-500"
             />
           </div>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-300/30"
+          >
+            <option value="recent">Recently saved</option>
+            <option value="title">Title A-Z</option>
+            <option value="composer">Composer A-Z</option>
+          </select>
         </div>
 
         {/* Empty state */}
         {bookmarks.length === 0 && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-10 text-center">
             <p className="text-xl font-semibold">No bookmarks yet</p>
             <p className="text-gray-400 mt-2">
               Start bookmarking your favorite MIDI files from the All MIDI page.
@@ -314,8 +331,8 @@ useEffect(() => {
                 <Link
                   key={b.id}
                   href={`/midi/${b.midi.id}`}
-                  className="group bg-white/5 border border-white/10 rounded-2xl p-4
-                    hover:bg-white/10 hover:border-blue-400/40 transition shadow-lg
+                  className="card-lift group bg-white/[0.055] border border-white/10 rounded-2xl p-4
+                    hover:bg-white/10 hover:border-cyan-300/40 transition shadow-lg
                     flex flex-col gap-3 relative overflow-hidden"
                 >
                   {/* Thumbnail */}

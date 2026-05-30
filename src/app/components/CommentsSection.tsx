@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import { Loader2, MessageSquare, Send, Trash2 } from "lucide-react";
 
 type CommentRow = {
@@ -50,11 +50,11 @@ export function CommentsSection({ midiId }: { midiId: string }) {
 
   // session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    pocketbase.auth.getSession().then(({ data }) => {
       setUserId(data.session?.user?.id ?? null);
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_evt, session) => {
+    const { data } = pocketbase.auth.onAuthStateChange((_evt, session) => {
       setUserId(session?.user?.id ?? null);
     });
 
@@ -65,7 +65,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     setLoading(true);
 
     // 1) Get comments (no join)
-    const { data: commentData, error: commentErr } = await supabase
+    const { data: commentData, error: commentErr } = await pocketbase
       .from("midi_comments")
       .select("id, body, created_at, user_id")
       .eq("midi_id", midiId)
@@ -91,9 +91,9 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     let usernameMap = new Map<string, string>();
 
     if (ids.length > 0) {
-      const { data: profileData, error: profileErr } = await supabase
+      const { data: profileData, error: profileErr } = await pocketbase
         .from("profiles")
-        .select("id, username")
+        .select<ProfileRow>("id, username")
         .in("id", ids);
 
       if (profileErr) {
@@ -127,7 +127,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
   useEffect(() => {
     fetchComments();
 
-    const channel = supabase
+    const channel = pocketbase
       .channel(`midi_comments:${midiId}`)
       .on(
         "postgres_changes",
@@ -137,7 +137,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      pocketbase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [midiId]);
@@ -153,7 +153,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
 
     setPosting(true);
 
-    const { error } = await supabase.from("midi_comments").insert({
+    const { error } = await pocketbase.from("midi_comments").insert({
       midi_id: midiId,
       user_id: userId,
       body: trimmed,
@@ -178,7 +178,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from("midi_comments").delete().eq("id", id);
+    const { error } = await pocketbase.from("midi_comments").delete().eq("id", id);
 
     if (error) {
       console.error("Delete comment error:", {

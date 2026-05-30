@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import {
   Loader2,
   Music2,
@@ -12,6 +12,7 @@ import {
   UploadCloud,
   FileText,
   ArrowRight,
+  TrendingUp,
 } from "lucide-react";
 
 type UploadRow = {
@@ -24,6 +25,7 @@ type UploadRow = {
   created_at: string;
   pdf_url: string | null;
 };
+
 
 function timeAgo(iso: string) {
   const d = new Date(iso).getTime();
@@ -48,6 +50,12 @@ export default function MyUploadsPage() {
   const [q, setQ] = useState("");
   const [genre, setGenre] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const uploadStats = useMemo(() => {
+    const totalDownloads = rows.reduce((sum, row) => sum + (row.downloads ?? 0), 0);
+    const withPdf = rows.filter((row) => row.pdf_url).length;
+    const genres = new Set(rows.map((row) => row.genre).filter(Boolean)).size;
+    return { totalDownloads, withPdf, genres };
+  }, [rows]);
 
   const GENRES = useMemo(
     () => [
@@ -128,9 +136,9 @@ export default function MyUploadsPage() {
   const fetchUploads = async (uid: string) => {
     setLoading(true);
 
-    let query = supabase
+    let query = pocketbase
       .from("music_files")
-      .select(
+      .select<UploadRow>(
         "id, title, composer, genre, bpm, downloads, created_at, pdf_url"
       )
       .eq("uploaded_by", uid)
@@ -154,7 +162,7 @@ export default function MyUploadsPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await pocketbase.auth.getUser();
       if (error) console.error("getUser error:", error);
 
       if (!data?.user) {
@@ -182,16 +190,7 @@ export default function MyUploadsPage() {
 
     setDeletingId(id);
 
-    // We’ll fetch the file paths first so we can remove storage objects too
-    const { data: row, error: rowErr } = await supabase
-      .from("music_files")
-      .select("midi_url, pdf_url")
-      .eq("id", id)
-      .single();
-
-    if (rowErr) console.error("Fetch row for delete error:", rowErr);
-
-    const { error } = await supabase.from("music_files").delete().eq("id", id);
+    const { error } = await pocketbase.from("music_files").delete().eq("id", id);
 
     if (error) {
       console.error("Delete DB row error:", error);
@@ -200,22 +199,12 @@ export default function MyUploadsPage() {
       return;
     }
 
-    // Best-effort storage cleanup (may fail if old files were not in user folder policies)
-    if (row?.midi_url) {
-      const r = await supabase.storage.from("midis").remove([row.midi_url]);
-      if (r.error) console.warn("MIDI remove warning:", r.error);
-    }
-    if (row?.pdf_url) {
-      const r = await supabase.storage.from("pdfs").remove([row.pdf_url]);
-      if (r.error) console.warn("PDF remove warning:", r.error);
-    }
-
     setRows((prev) => prev.filter((x) => x.id !== id));
     setDeletingId(null);
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       {/* glows */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-72 w-[900px] rounded-full bg-blue-500/10 blur-3xl" />
@@ -252,8 +241,15 @@ export default function MyUploadsPage() {
           </Link>
         </div>
 
+        <section className="grid gap-3 sm:grid-cols-4">
+          <UploadStat icon={<Music2 size={18} />} label="Uploads" value={String(rows.length)} />
+          <UploadStat icon={<TrendingUp size={18} />} label="Downloads" value={String(uploadStats.totalDownloads)} />
+          <UploadStat icon={<FileText size={18} />} label="With PDF" value={String(uploadStats.withPdf)} />
+          <UploadStat icon={<UploadCloud size={18} />} label="Genres" value={String(uploadStats.genres)} />
+        </section>
+
         {/* Filters */}
-        <section className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-xl">
+        <section className="bg-white/[0.055] border border-white/10 rounded-3xl p-5 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <input
               value={q}
@@ -321,7 +317,7 @@ export default function MyUploadsPage() {
             {rows.map((m) => (
               <div
                 key={m.id}
-                className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col"
+                className="card-lift bg-white/[0.055] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col hover:border-cyan-300/35"
               >
                 <div className="w-full h-44 bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
                   {m.pdf_url ? (
@@ -396,5 +392,15 @@ export default function MyUploadsPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function UploadStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="card-lift rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+      <div className="text-cyan-200">{icon}</div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-black">{value}</p>
+    </div>
   );
 }

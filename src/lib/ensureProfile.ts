@@ -1,4 +1,4 @@
-import { supabase } from "./supbaseClient";
+import { pocketbase } from "./pocketbaseClient";
 
 function randomUsername() {
   // short, readable, unique-ish
@@ -11,12 +11,12 @@ function randomUsername() {
 }
 
 export async function ensureProfileForCurrentUser() {
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData } = await pocketbase.auth.getUser();
   const user = userData.user;
   if (!user) return;
 
   // Does profile exist?
-  const { data: existing, error: readErr } = await supabase
+  const { data: existing, error: readErr } = await pocketbase
     .from("profiles")
     .select("id, username")
     .eq("id", user.id)
@@ -31,7 +31,7 @@ export async function ensureProfileForCurrentUser() {
   // Create one (retry if username collision)
   for (let i = 0; i < 5; i++) {
     const username = randomUsername();
-    const { error } = await supabase.from("profiles").insert({
+    const { error } = await pocketbase.from("profiles").insert({
       id: user.id,
       username,
     });

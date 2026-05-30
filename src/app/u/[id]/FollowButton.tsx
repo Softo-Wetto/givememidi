@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supbaseClient";
+import { pocketbase } from "../../../lib/pocketbaseClient";
 
 export default function FollowButton({ targetUserId }: { targetUserId: string }) {
   const router = useRouter();
@@ -17,7 +17,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
 
     (async () => {
       setLoading(true);
-      const { data } = await supabase.auth.getUser();
+      const { data } = await pocketbase.auth.getUser();
       const myId = data.user?.id ?? null;
 
       if (!alive) return;
@@ -29,7 +29,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
         return;
       }
 
-      const { data: row, error } = await supabase
+      const { data: row, error } = await pocketbase
         .from("follows")
         .select("follower_id")
         .eq("follower_id", myId)
@@ -59,7 +59,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
     setLoading(true);
 
     if (!following) {
-      const { error } = await supabase.from("follows").insert({
+      const { error } = await pocketbase.from("follows").insert({
         follower_id: me,
         following_id: targetUserId,
       });
@@ -71,7 +71,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
         router.refresh();
       }
     } else {
-      const { error } = await supabase
+      const { error } = await pocketbase
         .from("follows")
         .delete()
         .eq("follower_id", me)

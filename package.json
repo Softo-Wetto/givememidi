@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pb:setup": "node scripts/setup-pocketbase.mjs",
+    "pb:import": "node scripts/import-legacy-csv.mjs",
+    "pb:check": "node scripts/check-pocketbase-queries.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.57.4",
     "@tonejs/midi": "^2.0.28",
     "framer-motion": "^12.35.0",
     "lucide-react": "^0.562.0",

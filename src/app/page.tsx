@@ -1,20 +1,29 @@
-// src/app/page.tsx
-import { createClient } from "@supabase/supabase-js";
+import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import Link from "next/link";
+import { ArrowRight, Music2, Search, Sparkles, UploadCloud } from "lucide-react";
 import { MidiCard } from "./components/MidiCard";
 import { MidiRowScroller } from "./components/MidiRowScroller";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+const pocketbase = createPocketBaseClient();
+
+type MidiRow = {
+  id: string;
+  title: string;
+  composer?: string | null;
+  downloads?: number | null;
+  pdf_url?: string | null;
+  genre?: string | null;
+  bpm?: number | null;
+};
 
 type RatingAgg = { sum: number; count: number };
 
 async function fetchRatingAggForMidiIds(ids: string[]) {
   if (ids.length === 0) return new Map<string, RatingAgg>();
 
-  const { data, error } = await supabase
+  const { data, error } = await pocketbase
     .from("midi_ratings")
     .select("midi_id, rating")
     .in("midi_id", ids);
@@ -25,17 +34,20 @@ async function fetchRatingAggForMidiIds(ids: string[]) {
   }
 
   const map = new Map<string, RatingAgg>();
-
-  for (const r of data ?? []) {
-    const prev = map.get(r.midi_id) ?? { sum: 0, count: 0 };
-    map.set(r.midi_id, { sum: prev.sum + (r.rating ?? 0), count: prev.count + 1 });
+  for (const rating of data ?? []) {
+    const midiId = (rating as any).midi_id as string;
+    const prev = map.get(midiId) ?? { sum: 0, count: 0 };
+    map.set(midiId, {
+      sum: prev.sum + (((rating as any).rating ?? 0) as number),
+      count: prev.count + 1,
+    });
   }
 
   return map;
 }
 
 async function fetchTopRatedMidiIds(limit = 15, minRatings = 2) {
-  const { data, error } = await supabase
+  const { data, error } = await pocketbase
     .from("midi_ratings")
     .select("midi_id, rating");
 
@@ -44,23 +56,36 @@ async function fetchTopRatedMidiIds(limit = 15, minRatings = 2) {
     return [] as string[];
   }
 
-  const map = new Map<string, { sum: number; count: number }>();
-
-  for (const r of data ?? []) {
-    const id = r.midi_id as string;
-    const prev = map.get(id) ?? { sum: 0, count: 0 };
-    map.set(id, { sum: prev.sum + (r.rating ?? 0), count: prev.count + 1 });
+  const map = new Map<string, RatingAgg>();
+  for (const rating of data ?? []) {
+    const midiId = (rating as any).midi_id as string;
+    const prev = map.get(midiId) ?? { sum: 0, count: 0 };
+    map.set(midiId, {
+      sum: prev.sum + (((rating as any).rating ?? 0) as number),
+      count: prev.count + 1,
+    });
   }
 
-  // sort by avg desc, then count desc
-  const sorted = Array.from(map.entries())
+  return Array.from(map.entries())
     .map(([midiId, agg]) => ({ midiId, avg: agg.sum / agg.count, count: agg.count }))
-    .filter((x) => x.count >= minRatings)
-    .sort((a, b) => (b.avg - a.avg) || (b.count - a.count))
+    .filter((item) => item.count >= minRatings)
+    .sort((a, b) => b.avg - a.avg || b.count - a.count)
     .slice(0, limit)
-    .map((x) => x.midiId);
+    .map((item) => item.midiId);
+}
 
-  return sorted;
+function topGenresFrom(rows: MidiRow[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const genre = row.genre?.trim();
+    if (!genre) continue;
+    counts.set(genre, (counts.get(genre) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8)
+    .map(([genre, count]) => ({ genre, count }));
 }
 
 export default async function Home() {
@@ -72,144 +97,261 @@ export default async function Home() {
     { data: pdfMidis },
     topRatedIds,
   ] = await Promise.all([
-    supabase.from("music_files").select("*").order("downloads", { ascending: false }).limit(15),
-    supabase.from("music_files").select("*").order("created_at", { ascending: false }).limit(15),
-    supabase.from("music_files").select("*").not("pdf_url", "is", null).order("created_at", { ascending: false }).limit(15),
+    pocketbase.from("music_files").select("*").order("downloads", { ascending: false }).limit(15),
+    pocketbase.from("music_files").select("*").order("created_at", { ascending: false }).limit(15),
+    pocketbase.from("music_files").select("*").not("pdf_url", "is", null).order("created_at", { ascending: false }).limit(15),
     topRatedIdsPromise,
   ]);
 
   const { data: topRatedMidis, error: topRatedErr } =
     topRatedIds.length > 0
-      ? await supabase
-          .from("music_files")
-          .select("*")
-          .in("id", topRatedIds)
+      ? await pocketbase.from("music_files").select("*").in("id", topRatedIds)
       : { data: [], error: null };
 
   if (topRatedErr) console.error("topRatedMidis fetch error:", topRatedErr);
 
-  // keep order same as topRatedIds
-  const topRatedOrdered =
-    (topRatedMidis ?? []).slice().sort(
-      (a: any, b: any) => topRatedIds.indexOf(a.id) - topRatedIds.indexOf(b.id)
-    );
+  const topRatedOrdered = ((topRatedMidis ?? []) as MidiRow[]).slice().sort(
+    (a, b) => topRatedIds.indexOf(a.id) - topRatedIds.indexOf(b.id)
+  );
 
-    // Build a unique list of IDs shown on the homepage (popular + latest + pdf)
-    const allIds = Array.from(
-      new Set([
-        ...(popularMidis ?? []).map((m: any) => m.id),
-        ...(latestMidis ?? []).map((m: any) => m.id),
-        ...(pdfMidis ?? []).map((m: any) => m.id),
-        ...(topRatedOrdered ?? []).map((m: any) => m.id),
-      ])
-    );
+  const shownRows = [
+    ...((popularMidis ?? []) as MidiRow[]),
+    ...((latestMidis ?? []) as MidiRow[]),
+    ...((pdfMidis ?? []) as MidiRow[]),
+    ...topRatedOrdered,
+  ];
 
-    const ratingMap = await fetchRatingAggForMidiIds(allIds);
+  const allIds = Array.from(new Set(shownRows.map((midi) => midi.id)));
+  const ratingMap = await fetchRatingAggForMidiIds(allIds);
+  const topGenres = topGenresFrom(shownRows);
 
-    const getAvg = (id: string) => {
-      const agg = ratingMap.get(id);
-      if (!agg || agg.count === 0) return { avgRating: null, ratingCount: 0 };
-      return { avgRating: agg.sum / agg.count, ratingCount: agg.count };
-    };
+  const getAvg = (id: string) => {
+    const agg = ratingMap.get(id);
+    if (!agg || agg.count === 0) return { avgRating: null, ratingCount: 0 };
+    return { avgRating: agg.sum / agg.count, ratingCount: agg.count };
+  };
 
   const hasPopular = (popularMidis?.length ?? 0) > 0;
   const hasLatest = (latestMidis?.length ?? 0) > 0;
   const hasPdf = (pdfMidis?.length ?? 0) > 0;
-  const hasTopRated = (topRatedOrdered?.length ?? 0) > 0;
+  const hasTopRated = topRatedOrdered.length > 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
-      {/* HERO */}
-      <section className="relative overflow-hidden">
-        {/* subtle background glow */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
-          <div className="absolute top-24 left-16 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
-          <div className="absolute top-40 right-16 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
-        </div>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
 
-        <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-12 md:pt-28 md:pb-16 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300">
-            🎵 MIDI + 📄 Sheet music • fast downloads • clean previews
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-16 md:grid-cols-[1.05fr_0.95fr] md:pb-18 md:pt-24">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-blue-100 backdrop-blur">
+              <Sparkles size={16} className="text-cyan-300" />
+              MIDI, PDF scores, ratings, bookmarks, and creator discovery.
+            </div>
+
+            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight md:text-6xl">
+              Find the MIDI that gets your idea moving.
+            </h1>
+
+            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
+              Browse community uploads, preview arrangements, collect favorites, and share your own MIDI with optional sheet music.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/midi"
+                className="btn-glow tap inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg shadow-blue-950/40 transition hover:brightness-110"
+              >
+                <Search size={18} />
+                Browse MIDI
+              </Link>
+              <Link
+                href="/upload"
+                className="tap inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
+              >
+                <UploadCloud size={18} />
+                Upload a file
+              </Link>
+            </div>
+
+            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+              <Stat label="Popular picks" value={hasPopular ? `${popularMidis!.length} featured` : "None yet"} />
+              <Stat label="New uploads" value={hasLatest ? `${latestMidis!.length} latest` : "None yet"} />
+              <Stat label="Sheet music" value={hasPdf ? `${pdfMidis!.length} with PDF` : "None yet"} />
+            </div>
+
+            {topGenres.length > 0 ? <FeaturedGenres genres={topGenres} /> : null}
           </div>
 
-          <h1 className="mt-6 text-4xl md:text-6xl font-extrabold leading-tight">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
-              Download MIDI & Sheet Music
-            </span>
-          </h1>
+          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5 shadow-2xl shadow-blue-950/20 backdrop-blur">
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(59,130,246,0.14),transparent_35%),linear-gradient(315deg,rgba(34,211,238,0.12),transparent_35%)]" />
+            <div className="relative flex h-full flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-200">
+                  <Music2 size={16} className="text-cyan-300" />
+                  Live discovery
+                </div>
+                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
+                  PocketBase powered
+                </span>
+              </div>
 
-          <p className="mt-4 text-gray-300/90 text-base md:text-lg max-w-2xl mx-auto">
-            High-quality MIDI and PDF scores for composers, producers, and musicians.
-            Find popular files, explore new uploads, and bookmark your favorites.
-          </p>
+              <div className="mt-10 space-y-4">
+                {((popularMidis ?? []) as MidiRow[]).slice(0, 4).map((midi, index) => (
+                  <Link
+                    key={midi.id}
+                    href={`/midi/${midi.id}`}
+                    className="card-lift flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur transition hover:border-cyan-300/35 hover:bg-white/[0.085]"
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-400/15 text-blue-100 ring-1 ring-blue-300/20">
+                      {index + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold text-white">{midi.title}</p>
+                      <p className="truncate text-sm text-slate-400">{midi.composer || "Unknown composer"}</p>
+                    </div>
+                    <ArrowRight size={18} className="text-slate-500" />
+                  </Link>
+                ))}
+              </div>
 
-          {/* CTAs */}
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/midi"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-semibold
-                         bg-gradient-to-r from-blue-500 to-indigo-500
-                         hover:from-blue-400 hover:to-indigo-400
-                         shadow-lg transition"
-            >
-              Browse all MIDI
-            </Link>
-
-            <Link
-              href="/upload"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-semibold
-                        border border-white/15 text-gray-200
-                        hover:border-blue-400/60 hover:bg-white/5
-                        transition"
-            >
-              Upload your MIDI
-            </Link>
-          </div>
-
-          {/* quick stats (safe fallbacks) */}
-          <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            <Stat
-              label="Popular picks"
-              value={hasPopular ? `${popularMidis!.length} featured` : "—"}
-            />
-            <Stat
-              label="New uploads"
-              value={hasLatest ? `${latestMidis!.length} latest` : "—"}
-            />
-            <Stat
-              label="Sheet music"
-              value={hasPdf ? `${pdfMidis!.length} with PDF` : "—"}
-            />
+              <div className="mt-8 h-24 overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="flex h-full items-end gap-1.5">
+                  {Array.from({ length: 34 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="motion-bar block flex-1 rounded-t bg-gradient-to-t from-blue-500/45 to-cyan-300/80"
+                      style={{ height: `${24 + ((i * 23) % 62)}%`, animationDelay: `${i * 40}ms` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CONTENT */}
-      <section className="max-w-7xl mx-auto px-6 pb-24 space-y-14">
-        {/* POPULAR */}
-        <SectionHeader
-          title="🔥 Popular MIDI Files"
+      <section className="mx-auto max-w-7xl space-y-14 px-6 pb-24 pt-12">
+        <MidiSection
+          title="Popular MIDI files"
           subtitle="The most downloaded files right now."
+          href="/midi?sort=downloads"
+          linkLabel="View all"
+          rows={(popularMidis ?? []) as MidiRow[]}
+          getAvg={getAvg}
+          emptyTitle="No popular files yet"
+          emptySubtitle="Once people start downloading, your top files will show up here."
+        />
+
+        <MidiSection
+          title="Latest uploads"
+          subtitle="Fresh uploads added recently."
+          href="/midi"
+          linkLabel="Browse latest"
+          rows={(latestMidis ?? []) as MidiRow[]}
+          getAvg={getAvg}
+          emptyTitle="No uploads yet"
+          emptySubtitle="Be the first to upload a MIDI file."
+          ctaHref="/upload"
+          ctaLabel="Upload MIDI"
+        />
+
+        <MidiSection
+          title="Highest rated"
+          subtitle="Community favorites by average rating."
           href="/midi"
           linkLabel="View all"
+          rows={topRatedOrdered}
+          getAvg={getAvg}
+          emptyTitle="No rated files yet"
+          emptySubtitle="Once people start rating uploads, the top-rated files will show up here."
         />
-        {hasPopular ? (
-        <MidiRowScroller itemCount={popularMidis!.length}>
-          {popularMidis!.map((midi: any) => {
+
+        <MidiSection
+          title="With sheet music"
+          subtitle="MIDI files that include downloadable PDF sheet music."
+          href="/midi"
+          linkLabel="Explore PDFs"
+          rows={(pdfMidis ?? []) as MidiRow[]}
+          getAvg={getAvg}
+          emptyTitle="No PDFs uploaded yet"
+          emptySubtitle="Upload a sheet music PDF with your MIDI and it will appear here."
+          ctaHref="/upload"
+          ctaLabel="Upload MIDI + PDF"
+        />
+
+        <div className="hover-shine rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/20 md:p-8">
+          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <h3 className="text-2xl font-black">Build your collection</h3>
+              <p className="mt-2 max-w-2xl text-gray-300">
+                Upload MIDI, attach optional sheet music, rate discoveries, and bookmark favorites to keep your creative reference library close.
+              </p>
+            </div>
+
+            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+              <Link
+                href="/upload"
+                className="btn-glow tap inline-flex justify-center rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg transition hover:brightness-110"
+              >
+                Upload
+              </Link>
+              <Link
+                href="/bookmarks"
+                className="tap inline-flex justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
+              >
+                View bookmarks
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function MidiSection({
+  title,
+  subtitle,
+  href,
+  linkLabel,
+  rows,
+  getAvg,
+  emptyTitle,
+  emptySubtitle,
+  ctaHref,
+  ctaLabel,
+}: {
+  title: string;
+  subtitle: string;
+  href: string;
+  linkLabel: string;
+  rows: MidiRow[];
+  getAvg: (id: string) => { avgRating: number | null; ratingCount: number };
+  emptyTitle: string;
+  emptySubtitle: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <section className="space-y-5">
+      <SectionHeader title={title} subtitle={subtitle} href={href} linkLabel={linkLabel} />
+      {rows.length > 0 ? (
+        <MidiRowScroller itemCount={rows.length}>
+          {rows.map((midi) => {
             const { avgRating, ratingCount } = getAvg(midi.id);
 
             return (
-              <div
-                key={midi.id}
-                className="snap-start shrink-0 w-[280px] sm:w-[320px]"
-              >
+              <div key={midi.id} className="snap-start shrink-0 w-[280px] sm:w-[320px]">
                 <MidiCard
                   id={midi.id}
                   title={midi.title}
                   composer={midi.composer}
                   downloads={midi.downloads}
                   pdfUrl={midi.pdf_url || null}
+                  genre={midi.genre}
+                  bpm={midi.bpm}
                   avgRating={avgRating}
                   ratingCount={ratingCount}
                 />
@@ -218,165 +360,36 @@ export default async function Home() {
           })}
         </MidiRowScroller>
       ) : (
-        <EmptyState
-          title="No popular files yet"
-          subtitle="Once people start downloading, your top files will show up here."
-        />
+        <EmptyState title={emptyTitle} subtitle={emptySubtitle} ctaHref={ctaHref} ctaLabel={ctaLabel} />
       )}
+    </section>
+  );
+}
 
-        {/* LATEST */}
-        <SectionHeader
-          title="🆕 Latest Uploads"
-          subtitle="Fresh uploads added recently."
-          href="/midi"
-          linkLabel="Browse latest"
-        />
-        {hasLatest ? (
-          <MidiRowScroller itemCount={popularMidis!.length}>
-            {latestMidis!.map((midi: any) => {
-              const { avgRating, ratingCount } = getAvg(midi.id);
-
-                    return (
-                      <div
-                        key={midi.id}
-                        className="snap-start shrink-0 w-[280px] sm:w-[320px]"
-                      >
-                        <MidiCard
-                          id={midi.id}
-                          title={midi.title}
-                          composer={midi.composer}
-                          downloads={midi.downloads}
-                          pdfUrl={midi.pdf_url || null}
-                          avgRating={avgRating}
-                          ratingCount={ratingCount}
-                        />
-                      </div>
-                    );
-                  })}
-                </MidiRowScroller>
-              ) : (
-          <EmptyState
-            title="No uploads yet"
-            subtitle="Be the first to upload a MIDI file."
-            ctaHref="/upload"
-            ctaLabel="Upload MIDI"
-          />
-        )}
-
-        {/* TOP RATED */}
-        <SectionHeader
-          title="🏆 Highest Rated"
-          subtitle="Top-rated MIDI files (by average rating)."
-          href="/midi"
-          linkLabel="View all"
-        />
-
-        {hasTopRated ? (
-          <MidiRowScroller itemCount={topRatedOrdered!.length}>
-            {topRatedOrdered!.map((midi: any) => {
-              const { avgRating, ratingCount } = getAvg(midi.id);
-
-              return (
-                <div key={midi.id} className="snap-start shrink-0 w-[280px] sm:w-[320px]">
-                  <MidiCard
-                    id={midi.id}
-                    title={midi.title}
-                    composer={midi.composer}
-                    downloads={midi.downloads}
-                    pdfUrl={midi.pdf_url || null}
-                    avgRating={avgRating}
-                    ratingCount={ratingCount}
-                  />
-                </div>
-              );
-            })}
-          </MidiRowScroller>
-        ) : (
-          <EmptyState
-            title="No rated files yet"
-            subtitle="Once people start rating uploads, the top-rated files will show up here."
-          />
-        )}
-
-        {/* SHEET MUSIC / PDF SECTION */}
-        <SectionHeader
-          title="📄 With Sheet Music (PDF)"
-          subtitle="MIDI files that include downloadable sheet music."
-          href="/midi"
-          linkLabel="Explore PDFs"
-        />
-        {hasPdf ? (
-          <MidiRowScroller itemCount={popularMidis!.length}>
-            {pdfMidis!.map((midi: any) => {
-              const { avgRating, ratingCount } = getAvg(midi.id);
-
-                    return (
-                      <div
-                        key={midi.id}
-                        className="snap-start shrink-0 w-[280px] sm:w-[320px]"
-                      >
-                        <MidiCard
-                          id={midi.id}
-                          title={midi.title}
-                          composer={midi.composer}
-                          downloads={midi.downloads}
-                          pdfUrl={midi.pdf_url || null}
-                          avgRating={avgRating}
-                          ratingCount={ratingCount}
-                        />
-                      </div>
-                    );
-                  })}
-                </MidiRowScroller>
-              ) : (
-          <EmptyState
-            title="No PDFs uploaded yet"
-            subtitle="Upload a sheet music PDF with your MIDI and it will appear here."
-            ctaHref="/upload"
-            ctaLabel="Upload MIDI + PDF"
-          />
-        )}
-
-        {/* CTA STRIP */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-xl font-bold">Build your collection</h3>
-            <p className="text-gray-300/80 mt-1">
-              Upload MIDI (and optional PDF) or bookmark favorites to keep them handy.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <Link
-              href="/upload"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-semibold
-                        bg-gradient-to-r from-blue-500 to-indigo-500
-                        hover:from-blue-400 hover:to-indigo-400
-                        shadow-lg transition text-center"
-            >
-              Upload
-            </Link>
-            <Link
-              href="/bookmarks"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-semibold
-                         border border-white/15 text-gray-200
-                         hover:border-blue-400/60 hover:bg-white/5
-                         transition text-center"
-            >
-              View bookmarks
-            </Link>
-          </div>
-        </div>
-      </section>
-    </main>
+function FeaturedGenres({ genres }: { genres: { genre: string; count: number }[] }) {
+  return (
+    <div className="mt-7">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Start with a genre</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {genres.map(({ genre, count }) => (
+          <Link
+            key={genre}
+            href={`/midi?genre=${encodeURIComponent(genre)}`}
+            className="tap rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
+          >
+            {genre} <span className="text-slate-500">{count}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-left">
-      <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    <div className="card-lift rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-left">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-lg font-bold text-white">{value}</p>
     </div>
   );
 }
@@ -389,24 +402,23 @@ function SectionHeader({
 }: {
   title: string;
   subtitle: string;
-  href?: string;
-  linkLabel?: string;
+  href: string;
+  linkLabel: string;
 }) {
   return (
-    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
       <div>
-        <h2 className="text-2xl font-bold">{title}</h2>
+        <h2 className="text-2xl font-black tracking-tight">{title}</h2>
         <p className="text-gray-400">{subtitle}</p>
       </div>
 
-      {href && linkLabel && (
-        <Link
-          href={href}
-          className="text-sm font-semibold text-blue-300 hover:text-blue-200 transition self-start md:self-auto"
-        >
-          {linkLabel} →
-        </Link>
-      )}
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1 self-start text-sm font-bold text-cyan-200 transition hover:text-white md:self-auto"
+      >
+        {linkLabel}
+        <ArrowRight size={15} />
+      </Link>
     </div>
   );
 }
@@ -422,36 +434,19 @@ function EmptyState({
   ctaHref?: string;
   ctaLabel?: string;
 }) {
-  const isUpload = ctaHref === "/upload";
-
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-8 text-center">
       <h3 className="text-lg font-bold">{title}</h3>
-      <p className="text-gray-400 mt-1">{subtitle}</p>
+      <p className="mt-1 text-gray-400">{subtitle}</p>
 
-      {ctaHref && ctaLabel && (
-        isUpload ? (
-          <Link
-            href="/upload"
-            className="inline-flex mt-5 px-6 py-3 rounded-xl font-semibold
-                       bg-gradient-to-r from-blue-500 to-indigo-500
-                       hover:from-blue-400 hover:to-indigo-400
-                       shadow-lg transition"
-          >
-            {ctaLabel}
-          </Link>
-        ) : (
-          <Link
-            href={ctaHref}
-            className="inline-flex mt-5 px-6 py-3 rounded-xl font-semibold
-                       bg-gradient-to-r from-blue-500 to-indigo-500
-                       hover:from-blue-400 hover:to-indigo-400
-                       shadow-lg transition"
-          >
-            {ctaLabel}
-          </Link>
-        )
-      )}
+      {ctaHref && ctaLabel ? (
+        <Link
+          href={ctaHref}
+          className="btn-glow mt-5 inline-flex rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg transition hover:brightness-110"
+        >
+          {ctaLabel}
+        </Link>
+      ) : null}
     </div>
   );
 }

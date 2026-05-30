@@ -1,12 +1,10 @@
-// src/app/creators/page.tsx
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
-import { Star, Users, Upload, TrendingUp, Crown } from "lucide-react";
+import { createPocketBaseClient } from "@/lib/pocketbaseClient";
+import { Crown, Music2, Sparkles, Star, TrendingUp, Upload, Users } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export const dynamic = "force-dynamic";
+
+const pocketbase = createPocketBaseClient();
 
 type Profile = {
   id: string;
@@ -25,30 +23,210 @@ type LeaderRow = Profile & {
 };
 
 function formatDate(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
+  if (!iso) return "Unknown";
   return new Intl.DateTimeFormat("en-AU", {
     year: "numeric",
     month: "short",
     day: "2-digit",
-  }).format(d);
+  }).format(new Date(iso));
 }
 
-function badgeList(u: LeaderRow) {
+function badgeList(creator: LeaderRow) {
   const badges: { label: string; hint: string }[] = [];
+  if (creator.followers >= 25) badges.push({ label: "Rising", hint: "25+ followers" });
+  if (creator.uploads >= 10) badges.push({ label: "Prolific", hint: "10+ uploads" });
+  if (creator.downloads >= 250) badges.push({ label: "Trending", hint: "250+ downloads" });
+  if (creator.avgRating !== null && creator.ratingCount >= 10 && creator.avgRating >= 4.5) {
+    badges.push({ label: "Top rated", hint: "4.5+ average" });
+  }
 
-  if (u.followers >= 25) badges.push({ label: "Rising Creator", hint: "25+ followers" });
-  if (u.uploads >= 10) badges.push({ label: "Prolific", hint: "10+ uploads" });
-  if (u.downloads >= 250) badges.push({ label: "Trending", hint: "250+ total downloads" });
-  if (u.avgRating !== null && u.ratingCount >= 10 && u.avgRating >= 4.5)
-    badges.push({ label: "Top Rated", hint: "4.5+ avg (10+ ratings)" });
-
-  if (badges.length === 0) badges.push({ label: "New Creator", hint: "Just getting started" });
-
+  if (badges.length === 0) badges.push({ label: "New creator", hint: "Just getting started" });
   return badges.slice(0, 3);
 }
 
-function Card({
+export default async function CreatorsPage() {
+  const { data: profiles, error: profErr } = await pocketbase
+    .from("profiles")
+    .select("id, username, avatar_url, bio, created_at")
+    .limit(200);
+
+  if (profErr) console.error("profiles fetch error:", profErr);
+
+  const profs = (profiles ?? []) as Profile[];
+  const ids = profs.map((profile) => profile.id);
+
+  if (ids.length === 0) {
+    return (
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <h1 className="text-4xl font-black">Creators</h1>
+          <p className="mt-2 text-gray-400">No creators found yet.</p>
+        </div>
+      </main>
+    );
+  }
+
+  const { data: followRows, error: folErr } = await pocketbase
+    .from("follows")
+    .select("following_id");
+
+  if (folErr) console.error("follows fetch error:", folErr);
+
+  const followersMap = new Map<string, number>();
+  for (const row of followRows ?? []) {
+    followersMap.set(row.following_id, (followersMap.get(row.following_id) ?? 0) + 1);
+  }
+
+  const { data: musicRows, error: musErr } = await pocketbase
+    .from("music_files")
+    .select("id, uploaded_by, downloads");
+
+  if (musErr) console.error("music_files fetch error:", musErr);
+
+  const uploadsMap = new Map<string, number>();
+  const downloadsMap = new Map<string, number>();
+  const creatorMidiIds = new Map<string, string[]>();
+
+  for (const midi of musicRows ?? []) {
+    const uid = midi.uploaded_by as string;
+    uploadsMap.set(uid, (uploadsMap.get(uid) ?? 0) + 1);
+    downloadsMap.set(uid, (downloadsMap.get(uid) ?? 0) + (midi.downloads ?? 0));
+    creatorMidiIds.set(uid, [...(creatorMidiIds.get(uid) ?? []), midi.id]);
+  }
+
+  const allMidiIds = (musicRows ?? []).map((midi: any) => midi.id);
+  let ratingRows: any[] = [];
+  if (allMidiIds.length > 0) {
+    const { data: ratings, error: rErr } = await pocketbase
+      .from("midi_ratings")
+      .select("midi_id, rating")
+      .in("midi_id", allMidiIds);
+
+    if (rErr) console.error("ratings fetch error:", rErr);
+    ratingRows = ratings ?? [];
+  }
+
+  const midiAgg = new Map<string, { sum: number; count: number }>();
+  for (const rating of ratingRows) {
+    const prev = midiAgg.get(rating.midi_id) ?? { sum: 0, count: 0 };
+    midiAgg.set(rating.midi_id, { sum: prev.sum + (rating.rating ?? 0), count: prev.count + 1 });
+  }
+
+  const creatorAgg = new Map<string, { sum: number; count: number }>();
+  for (const [uid, midiIds] of creatorMidiIds.entries()) {
+    let sum = 0;
+    let count = 0;
+    for (const midiId of midiIds) {
+      const agg = midiAgg.get(midiId);
+      if (!agg) continue;
+      sum += agg.sum;
+      count += agg.count;
+    }
+    creatorAgg.set(uid, { sum, count });
+  }
+
+  const leaders: LeaderRow[] = profs.map((profile) => {
+    const uploads = uploadsMap.get(profile.id) ?? 0;
+    const followers = followersMap.get(profile.id) ?? 0;
+    const downloads = downloadsMap.get(profile.id) ?? 0;
+    const agg = creatorAgg.get(profile.id) ?? { sum: 0, count: 0 };
+
+    return {
+      ...profile,
+      uploads,
+      followers,
+      downloads,
+      avgRating: agg.count > 0 ? agg.sum / agg.count : null,
+      ratingCount: agg.count,
+    };
+  });
+
+  const mostFollowed = leaders.slice().sort((a, b) => b.followers - a.followers).slice(0, 10);
+  const mostUploads = leaders.slice().sort((a, b) => b.uploads - a.uploads).slice(0, 10);
+  const mostDownloaded = leaders.slice().sort((a, b) => b.downloads - a.downloads).slice(0, 10);
+  const topRated = leaders
+    .filter((creator) => creator.ratingCount >= 10)
+    .slice()
+    .sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1))
+    .slice(0, 10);
+
+  const totalDownloads = leaders.reduce((sum, creator) => sum + creator.downloads, 0);
+  const totalUploads = leaders.reduce((sum, creator) => sum + creator.uploads, 0);
+  const activeCreators = leaders.filter((creator) => creator.uploads > 0).length;
+
+  return (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
+        <div className="relative mx-auto max-w-7xl px-6 pb-10 pt-14">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.055] px-4 py-2 text-sm text-blue-100">
+            <Sparkles size={16} className="text-cyan-300" />
+            Community leaderboard, creator discovery, and library signals.
+          </div>
+
+          <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">Top creators</h1>
+          <p className="mt-3 max-w-2xl leading-7 text-gray-300">
+            Find active uploaders, high-rated arrangers, and the profiles worth following next.
+          </p>
+
+          <div className="mt-8 grid gap-3 sm:grid-cols-4">
+            <CreatorStat icon={<Users size={18} />} label="Creators" value={String(leaders.length)} />
+            <CreatorStat icon={<Music2 size={18} />} label="Active" value={String(activeCreators)} />
+            <CreatorStat icon={<Upload size={18} />} label="Uploads" value={String(totalUploads)} />
+            <CreatorStat icon={<TrendingUp size={18} />} label="Downloads" value={String(totalDownloads)} />
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-12 lg:grid-cols-2">
+        <Leaderboard
+          title="Most followed"
+          subtitle="Creators with the biggest audiences."
+          icon={<Users className="text-blue-300" size={18} />}
+          rows={mostFollowed}
+          metricLabel={(creator) => `${creator.followers} followers`}
+        />
+        <Leaderboard
+          title="Most uploads"
+          subtitle="The most active library builders."
+          icon={<Upload className="text-emerald-300" size={18} />}
+          rows={mostUploads}
+          metricLabel={(creator) => `${creator.uploads} uploads`}
+        />
+        <Leaderboard
+          title="Most downloaded"
+          subtitle="Creators with the most total downloads."
+          icon={<TrendingUp className="text-yellow-300" size={18} />}
+          rows={mostDownloaded}
+          metricLabel={(creator) => `${creator.downloads} downloads`}
+        />
+        <Leaderboard
+          title="Top rated"
+          subtitle="Highest average rating, with enough ratings to mean something."
+          icon={<Star className="text-yellow-300" size={18} />}
+          rows={topRated.length > 0 ? topRated : mostFollowed.slice(0, 10)}
+          metricLabel={(creator) =>
+            creator.avgRating === null
+              ? "No ratings"
+              : `${creator.avgRating.toFixed(1)} / 5 (${creator.ratingCount})`
+          }
+        />
+      </div>
+    </main>
+  );
+}
+
+function CreatorStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="card-lift rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+      <div className="flex items-center gap-2 text-cyan-200">{icon}</div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function Leaderboard({
   title,
   subtitle,
   icon,
@@ -59,286 +237,70 @@ function Card({
   subtitle: string;
   icon: React.ReactNode;
   rows: LeaderRow[];
-  metricLabel: (r: LeaderRow) => string;
+  metricLabel: (creator: LeaderRow) => string;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
-      <div className="flex items-start justify-between gap-4 mb-5">
+    <section className="hover-shine rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/20">
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
+          <h2 className="flex items-center gap-2 text-xl font-black">
             {icon}
             {title}
           </h2>
-          <p className="text-sm text-gray-400 mt-1">{subtitle}</p>
+          <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
         </div>
       </div>
 
       <div className="space-y-3">
-        {rows.map((u, idx) => (
+        {rows.map((creator, index) => (
           <Link
-            key={u.id}
-            href={`/u/${u.id}`}
-            className="group block rounded-2xl border border-white/10 bg-black/20 hover:bg-white/5 transition p-4"
+            key={creator.id}
+            href={`/u/${creator.id}`}
+            className="card-lift block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-cyan-300/35 hover:bg-white/[0.075]"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
-                {u.avatar_url ? (
-                  <img src={u.avatar_url} alt={u.username} className="w-full h-full object-cover" />
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/10">
+                {creator.avatar_url ? (
+                  <img src={creator.avatar_url} alt={creator.username} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-gray-400">👤</div>
+                  <div className="flex h-full w-full items-center justify-center text-sm font-bold text-cyan-100">
+                    {creator.username?.slice(0, 1).toUpperCase() || "U"}
+                  </div>
                 )}
               </div>
 
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white truncate">{u.username}</span>
-                  {idx === 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/15 border border-yellow-500/20 text-yellow-200">
+                  <span className="truncate font-bold text-white">{creator.username}</span>
+                  {index === 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-yellow-500/20 bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-200">
                       <Crown size={14} /> #1
                     </span>
-                  )}
+                  ) : null}
                 </div>
-
-                {u.bio ? (
-                  <p className="text-sm text-gray-400 truncate">{u.bio}</p>
-                ) : (
-                  <p className="text-sm text-gray-600 italic truncate">No bio</p>
-                )}
-
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {badgeList(u).map((b) => (
-                    <span
-                      key={b.label}
-                      title={b.hint}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-gray-200"
-                    >
-                      ✨ {b.label}
-                    </span>
-                  ))}
-                </div>
+                <p className="truncate text-sm text-gray-400">{creator.bio || "No bio yet"}</p>
               </div>
 
-              <div className="text-right shrink-0">
-                <div className="text-sm font-semibold text-white">{metricLabel(u)}</div>
-                <div className="text-xs text-gray-500">Member since {formatDate(u.created_at)}</div>
+              <div className="shrink-0 text-right">
+                <div className="text-sm font-bold text-white">{metricLabel(creator)}</div>
+                <div className="text-xs text-gray-500">Since {formatDate(creator.created_at)}</div>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-              <div className="rounded-xl border border-white/10 bg-white/5 py-2">
-                <div className="text-xs text-gray-400">Uploads</div>
-                <div className="text-sm font-semibold">{u.uploads}</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 py-2">
-                <div className="text-xs text-gray-400">Followers</div>
-                <div className="text-sm font-semibold">{u.followers}</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 py-2">
-                <div className="text-xs text-gray-400">Downloads</div>
-                <div className="text-sm font-semibold">{u.downloads}</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 py-2">
-                <div className="text-xs text-gray-400">Rating</div>
-                <div className="text-sm font-semibold">
-                  {u.avgRating === null ? "—" : `${u.avgRating.toFixed(1)} (${u.ratingCount})`}
-                </div>
-              </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {badgeList(creator).map((badge) => (
+                <span
+                  key={badge.label}
+                  title={badge.hint}
+                  className="rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-100"
+                >
+                  {badge.label}
+                </span>
+              ))}
             </div>
           </Link>
         ))}
       </div>
     </section>
-  );
-}
-
-export default async function CreatorsPage() {
-  // 1) Base profiles
-  const { data: profiles, error: profErr } = await supabase
-    .from("profiles")
-    .select("id, username, avatar_url, bio, created_at")
-    .limit(200); // tweak if you expect lots of users
-
-  if (profErr) console.error("profiles fetch error:", profErr);
-
-  const profs = (profiles ?? []) as Profile[];
-  const ids = profs.map((p) => p.id);
-
-  if (ids.length === 0) {
-    return (
-      <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <h1 className="text-4xl font-extrabold">Creators</h1>
-          <p className="text-gray-400 mt-2">No creators found yet.</p>
-        </div>
-      </main>
-    );
-  }
-
-  // 2) Followers counts
-  const { data: followRows, error: folErr } = await supabase
-    .from("follows")
-    .select("following_id");
-
-  if (folErr) console.error("follows fetch error:", folErr);
-
-  const followersMap = new Map<string, number>();
-  for (const r of followRows ?? []) {
-    followersMap.set(r.following_id, (followersMap.get(r.following_id) ?? 0) + 1);
-  }
-
-  // 3) Uploads + downloads per creator
-  const { data: musicRows, error: musErr } = await supabase
-    .from("music_files")
-    .select("id, uploaded_by, downloads");
-
-  if (musErr) console.error("music_files fetch error:", musErr);
-
-  const uploadsMap = new Map<string, number>();
-  const downloadsMap = new Map<string, number>();
-  const creatorMidiIds = new Map<string, string[]>();
-
-  for (const m of musicRows ?? []) {
-    const uid = m.uploaded_by as string;
-    uploadsMap.set(uid, (uploadsMap.get(uid) ?? 0) + 1);
-    downloadsMap.set(uid, (downloadsMap.get(uid) ?? 0) + (m.downloads ?? 0));
-
-    const arr = creatorMidiIds.get(uid) ?? [];
-    arr.push(m.id);
-    creatorMidiIds.set(uid, arr);
-  }
-
-  // 4) Ratings (bulk) -> per creator aggregate
-  const allMidiIds = (musicRows ?? []).map((m: any) => m.id);
-  let ratingRows: any[] = [];
-  if (allMidiIds.length > 0) {
-    const { data: r, error: rErr } = await supabase
-      .from("midi_ratings")
-      .select("midi_id, rating")
-      .in("midi_id", allMidiIds);
-
-    if (rErr) console.error("ratings fetch error:", rErr);
-    ratingRows = r ?? [];
-  }
-
-  // midi -> agg
-  const midiAgg = new Map<string, { sum: number; count: number }>();
-  for (const r of ratingRows) {
-    const prev = midiAgg.get(r.midi_id) ?? { sum: 0, count: 0 };
-    midiAgg.set(r.midi_id, { sum: prev.sum + (r.rating ?? 0), count: prev.count + 1 });
-  }
-
-  // creator -> agg
-  const creatorAgg = new Map<string, { sum: number; count: number }>();
-  for (const [uid, mids] of creatorMidiIds.entries()) {
-    let sum = 0;
-    let count = 0;
-    for (const mid of mids) {
-      const a = midiAgg.get(mid);
-      if (!a) continue;
-      sum += a.sum;
-      count += a.count;
-    }
-    creatorAgg.set(uid, { sum, count });
-  }
-
-  const leaders: LeaderRow[] = profs.map((p) => {
-    const up = uploadsMap.get(p.id) ?? 0;
-    const fol = followersMap.get(p.id) ?? 0;
-    const dl = downloadsMap.get(p.id) ?? 0;
-    const a = creatorAgg.get(p.id) ?? { sum: 0, count: 0 };
-    const avg = a.count > 0 ? a.sum / a.count : null;
-
-    return {
-      ...p,
-      uploads: up,
-      followers: fol,
-      downloads: dl,
-      avgRating: avg,
-      ratingCount: a.count,
-    };
-  });
-
-  // Leaderboards
-  const mostFollowed = leaders
-    .slice()
-    .sort((a, b) => b.followers - a.followers)
-    .slice(0, 10);
-
-  const mostUploads = leaders
-    .slice()
-    .sort((a, b) => b.uploads - a.uploads)
-    .slice(0, 10);
-
-  const mostDownloaded = leaders
-    .slice()
-    .sort((a, b) => b.downloads - a.downloads)
-    .slice(0, 10);
-
-  // Weighted rating with minimum ratings to avoid 1-hit wonder
-  const topRated = leaders
-    .filter((u) => u.ratingCount >= 10)
-    .slice()
-    .sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1))
-    .slice(0, 10);
-
-  return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-500/15 blur-3xl" />
-          <div className="absolute top-24 left-16 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
-          <div className="absolute top-40 right-16 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300">
-            🏆 Community leaderboard • creators • uploads • ratings
-          </div>
-
-          <h1 className="mt-5 text-4xl md:text-5xl font-extrabold">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
-              Top Creators
-            </span>
-          </h1>
-
-          <p className="mt-3 text-gray-300/90 max-w-2xl">
-            Discover the most active and most loved creators — follow profiles and explore their uploads.
-          </p>
-        </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-6 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card
-          title="Most followed"
-          subtitle="Creators with the biggest audiences."
-          icon={<Users className="text-blue-300" size={18} />}
-          rows={mostFollowed}
-          metricLabel={(u) => `${u.followers} followers`}
-        />
-        <Card
-          title="Most uploads"
-          subtitle="Most active uploaders."
-          icon={<Upload className="text-emerald-300" size={18} />}
-          rows={mostUploads}
-          metricLabel={(u) => `${u.uploads} uploads`}
-        />
-        <Card
-          title="Most downloaded"
-          subtitle="Total downloads across all uploads."
-          icon={<TrendingUp className="text-yellow-300" size={18} />}
-          rows={mostDownloaded}
-          metricLabel={(u) => `${u.downloads} downloads`}
-        />
-        <Card
-          title="Top rated"
-          subtitle="Highest average rating (10+ ratings)."
-          icon={<Star className="text-yellow-300" size={18} />}
-          rows={topRated.length > 0 ? topRated : mostFollowed.slice(0, 10)}
-          metricLabel={(u) =>
-            u.avgRating === null ? "—" : `${u.avgRating.toFixed(1)} / 5 (${u.ratingCount})`
-          }
-        />
-      </div>
-    </main>
   );
 }

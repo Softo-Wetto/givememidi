@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Menu,
   X,
@@ -13,10 +13,11 @@ import {
   Bookmark,
   LogOut,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { User as UserIcon } from "lucide-react";
 import { UploadCloud } from "lucide-react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import { useAuth } from "./AuthProvider";
 import { Users } from "lucide-react";
 
@@ -24,13 +25,24 @@ type ProfileRow = {
   username: string | null;
 };
 
+type SearchSuggestion = {
+  id: string;
+  title: string;
+  composer: string | null;
+  genre: string | null;
+};
+
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchSuggesting, setSearchSuggesting] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState<string | null>(null);
@@ -67,6 +79,61 @@ export function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    let cancelled = false;
+
+    const timer = window.setTimeout(async () => {
+      if (q.length < 2) {
+        setSearchSuggestions([]);
+        setSearchSuggesting(false);
+        return;
+      }
+
+      setSearchSuggesting(true);
+
+      const safeQuery = q.replace(/[,"%]/g, " ").replace(/\s+/g, " ").trim();
+      if (!safeQuery) {
+        setSearchSuggestions([]);
+        setSearchSuggesting(false);
+        return;
+      }
+
+      const { data, error } = await pocketbase
+        .from("music_files")
+        .select<SearchSuggestion>("id,title,composer,genre")
+        .or(`title.ilike.%${safeQuery}%,composer.ilike.%${safeQuery}%,genre.ilike.%${safeQuery}%`)
+        .limit(6);
+
+      if (cancelled) return;
+      if (error) {
+        console.error("Search suggestions error:", error);
+        setSearchSuggestions([]);
+      } else {
+        setSearchSuggestions((data ?? []) as SearchSuggestion[]);
+      }
+      setSearchSuggesting(false);
+    }, q.length < 2 ? 0 : 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
   // Load username
   useEffect(() => {
     let alive = true;
@@ -77,7 +144,7 @@ export function Header() {
         return;
       }
 
-      const { data: prof, error } = await supabase
+      const { data: prof, error } = await pocketbase
         .from("profiles")
         .select("username")
         .eq("id", user.id)
@@ -108,6 +175,14 @@ export function Header() {
 
     router.push(`/midi?search=${encodeURIComponent(q)}`);
     setSearchQuery("");
+    setSearchFocused(false);
+    setMobileOpen(false);
+  };
+
+  const openSuggestion = (suggestion: SearchSuggestion) => {
+    router.push(`/midi/${suggestion.id}`);
+    setSearchQuery("");
+    setSearchFocused(false);
     setMobileOpen(false);
   };
 
@@ -124,6 +199,66 @@ export function Header() {
     const next = pathname && pathname !== "/login" ? pathname : "/upload";
     router.push(`/login?redirect=${encodeURIComponent(next)}`);
   };
+
+  const searchDropdown =
+    searchFocused && searchQuery.trim().length >= 2 ? (
+      <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <button
+          type="button"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            const q = searchQuery.trim();
+            if (!q) return;
+            router.push(`/midi?search=${encodeURIComponent(q)}`);
+            setSearchQuery("");
+            setSearchFocused(false);
+            setMobileOpen(false);
+          }}
+          className="flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left text-sm text-slate-200 transition hover:bg-white/[0.06]"
+        >
+          <span>
+            Search all for <span className="font-semibold text-white">{searchQuery.trim()}</span>
+          </span>
+          <Search size={15} className="text-cyan-300" />
+        </button>
+
+        {searchSuggesting ? (
+          <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-400">
+            <Loader2 size={15} className="animate-spin" />
+            Finding matches...
+          </div>
+        ) : searchSuggestions.length > 0 ? (
+          <div className="py-1">
+            {searchSuggestions.map((suggestion) => (
+              <button
+                key={suggestion.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  openSuggestion(suggestion);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.06]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-300/10 text-cyan-200 ring-1 ring-cyan-300/15">
+                  <Music size={16} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-white">
+                    {suggestion.title}
+                  </span>
+                  <span className="block truncate text-xs text-slate-400">
+                    {suggestion.composer || "Unknown composer"}
+                    {suggestion.genre ? ` • ${suggestion.genre}` : ""}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-3 text-sm text-slate-500">No quick matches yet.</div>
+        )}
+      </div>
+    ) : null;
 
   return (
     <header
@@ -151,17 +286,25 @@ export function Header() {
           {/* Search (desktop) */}
           <form
             onSubmit={handleSearch}
-            className="hidden md:flex flex-1 max-w-md items-center
-              bg-gray-800/70 rounded-2xl overflow-hidden border border-gray-700
+            className="relative hidden md:flex flex-1 max-w-md items-center
+              bg-gray-800/70 rounded-2xl overflow-visible border border-gray-700
               focus-within:ring-2 focus-within:ring-blue-400/60 transition"
           >
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search MIDI, composer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
               className="w-full px-4 py-2.5 bg-transparent text-white placeholder-gray-400 focus:outline-none"
             />
+            {!searchQuery ? (
+              <kbd className="mr-1 hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 lg:inline">
+                /
+              </kbd>
+            ) : null}
             <button
               type="submit"
               className="px-4 text-gray-300 hover:text-white transition"
@@ -169,6 +312,7 @@ export function Header() {
             >
               <Search size={18} />
             </button>
+            {searchDropdown}
           </form>
 
           {/* Desktop Actions */}
@@ -367,7 +511,7 @@ export function Header() {
                     <button
                       type="button"
                       onClick={async () => {
-                        await supabase.auth.signOut();
+                        await pocketbase.auth.signOut();
                         setProfileOpen(false);
                         router.push("/");
                       }}
@@ -410,13 +554,15 @@ export function Header() {
           <div className="md:hidden mt-4 pb-6 border-t border-gray-800 pt-6">
             <form
               onSubmit={handleSearch}
-              className="flex items-center bg-gray-800/70 rounded-2xl overflow-hidden border border-gray-700"
+              className="relative flex items-center bg-gray-800/70 rounded-2xl overflow-visible border border-gray-700"
             >
               <input
                 type="text"
                 placeholder="Search MIDI..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
                 className="w-full px-4 py-3 bg-transparent text-white focus:outline-none"
               />
               <button
@@ -426,6 +572,7 @@ export function Header() {
               >
                 <Search size={18} />
               </button>
+              {searchDropdown}
             </form>
 
             <nav className="flex flex-col gap-2 text-sm mt-4">
@@ -520,7 +667,7 @@ export function Header() {
                   <button
                     type="button"
                     onClick={async () => {
-                      await supabase.auth.signOut();
+                      await pocketbase.auth.signOut();
                       closeAll();
                       router.push("/");
                     }}

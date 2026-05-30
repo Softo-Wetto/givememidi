@@ -2,8 +2,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
+import { updateRecord } from "../../lib/pocketbase/client";
+import { getPocketBaseFileUrl } from "../../lib/pocketbase/config";
 import { useRouter } from "next/navigation";
+import { ShareButton } from "../components/ShareButton";
 import {
   Loader2,
   User,
@@ -31,6 +34,15 @@ function formatDate(iso?: string | null) {
 }
 
 type RatingAgg = { sum: number; count: number };
+type ProfileRow = {
+  id: string;
+  username: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  avatar?: string | null;
+};
+type UploadStatRow = { id: string; downloads: number | null };
+type RatingRow = { midi_id: string; rating: number | null };
 
 function badgeList(args: {
   uploads: number;
@@ -65,6 +77,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [email, setEmail] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const [provider, setProvider] = useState<string>("unknown");
@@ -109,7 +122,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await pocketbase.auth.getUser();
       const user = userData.user;
 
       if (!user) {
@@ -118,6 +131,7 @@ export default function ProfilePage() {
       }
 
       setEmail(user.email ?? null);
+      setCurrentUserId(user.id);
       setMemberSince(user.created_at ?? null);
 
       const id0 = user.identities?.[0];
@@ -125,11 +139,11 @@ export default function ProfilePage() {
       setProvider(p);
 
       // Profile
-      const { data: prof, error: profErr } = await supabase
+      const { data: prof, error: profErr } = await pocketbase
         .from("profiles")
-        .select("username, bio, avatar_url")
+        .select<ProfileRow>("username, bio, avatar_url")
         .eq("id", user.id)
-        .maybeSingle();
+        .maybeSingle<ProfileRow>();
 
       if (profErr) console.error("Profile fetch error:", profErr);
 
@@ -138,9 +152,9 @@ export default function ProfilePage() {
       setAvatarUrl(prof?.avatar_url ?? null);
 
       // Upload stats
-      const { data: uploads, error: upErr } = await supabase
+      const { data: uploads, error: upErr } = await pocketbase
         .from("music_files")
-        .select("id, downloads")
+        .select<UploadStatRow>("id, downloads")
         .eq("uploaded_by", user.id);
 
       if (upErr) console.error("uploads stats error:", upErr);
@@ -152,9 +166,9 @@ export default function ProfilePage() {
       // Rating stats (bulk fetch)
       let ratingMap = new Map<string, RatingAgg>();
       if (ids.length > 0) {
-        const { data: ratingRows, error: rErr } = await supabase
+        const { data: ratingRows, error: rErr } = await pocketbase
           .from("midi_ratings")
-          .select("midi_id, rating")
+          .select<RatingRow>("midi_id, rating")
           .in("midi_id", ids);
 
         if (rErr) console.error("ratings stats error:", rErr);
@@ -186,7 +200,7 @@ export default function ProfilePage() {
 
     setSavingProfile(true);
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await pocketbase.auth.getUser();
     const user = userData.user;
     if (!user) {
       setSavingProfile(false);
@@ -194,7 +208,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await pocketbase
       .from("profiles")
       .update({ username: clean, bio: cleanBio })
       .eq("id", user.id);
@@ -213,7 +227,7 @@ export default function ProfilePage() {
   const uploadAvatar = async (file: File) => {
     setUploadingAvatar(true);
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await pocketbase.auth.getUser();
     const user = userData.user;
 
     if (!user) {
@@ -223,29 +237,15 @@ export default function ProfilePage() {
     }
 
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const safeExt = ["png", "jpg", "jpeg", "webp"].includes(ext) ? ext : "png";
-      const path = `${user.id}/avatar.${safeExt}`;
+      const form = new FormData();
+      form.set("avatar", file);
 
-      // overwrite by removing old (optional)
-      await supabase.storage.from("avatars").remove([path]);
+      const profile = await updateRecord<ProfileRow>("profiles", user.id, form);
+      const publicUrl = getPocketBaseFileUrl("profiles", profile.id, profile.avatar);
 
-      const { error: upErr } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+      if (!publicUrl) throw new Error("PocketBase did not return an avatar file.");
 
-      if (upErr) throw upErr;
-
-      // public URL
-      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      const publicUrl = pub.publicUrl;
-
-      const { error: profErr } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", user.id);
-
-      if (profErr) throw profErr;
+      await updateRecord<ProfileRow>("profiles", user.id, { avatar_url: publicUrl });
 
       setAvatarUrl(publicUrl);
     } catch (e: any) {
@@ -263,7 +263,7 @@ export default function ProfilePage() {
 
     setSavingPassword(true);
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await pocketbase.auth.updateUser({ password: newPassword });
 
     setSavingPassword(false);
 
@@ -279,7 +279,7 @@ export default function ProfilePage() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await pocketbase.auth.signOut();
     router.push("/");
   };
 
@@ -301,8 +301,13 @@ export default function ProfilePage() {
     );
   }
 
+  const publicProfileUrl =
+    currentUserId && typeof window !== "undefined"
+      ? `${window.location.origin}/u/${currentUserId}`
+      : undefined;
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header card */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
@@ -370,6 +375,20 @@ export default function ProfilePage() {
               <LogOut size={16} />
               Sign out
             </button>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {currentUserId ? (
+              <>
+                <a
+                  href={`/u/${currentUserId}`}
+                  className="tap inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/40 hover:bg-white/10"
+                >
+                  View public profile
+                </a>
+                <ShareButton label="Copy profile link" url={publicProfileUrl} />
+              </>
+            ) : null}
           </div>
 
           {/* Stats */}

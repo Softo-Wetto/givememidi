@@ -1,5 +1,5 @@
 // src/app/u/[id]/page.tsx
-import { createClient } from "@supabase/supabase-js";
+import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import FollowButton from "./FollowButton";
@@ -7,13 +7,18 @@ import { MidiCard } from "../../components/MidiCard";
 import { MidiRowScroller } from "../../components/MidiRowScroller";
 import { Star, TrendingUp, Music2, Users } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const pocketbase = createPocketBaseClient();
 
 type Props = { params: { id: string } | Promise<{ id: string }> };
 type RatingAgg = { sum: number; count: number };
+type ProfileRow = {
+  id: string;
+  username: string;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string | null;
+};
+type RatingRow = { midi_id: string; rating: number | null };
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
@@ -28,9 +33,9 @@ function formatDate(iso?: string | null) {
 async function fetchRatingAggForMidiIds(ids: string[]) {
   if (ids.length === 0) return new Map<string, RatingAgg>();
 
-  const { data, error } = await supabase
+  const { data, error } = await pocketbase
     .from("midi_ratings")
-    .select("midi_id, rating")
+    .select<RatingRow>("midi_id, rating")
     .in("midi_id", ids);
 
   if (error) {
@@ -127,11 +132,11 @@ export default async function PublicProfilePage({ params }: Props) {
   const { id } = await Promise.resolve(params);
 
   // profile
-  const { data: profile, error: profErr } = await supabase
+  const { data: profile, error: profErr } = await pocketbase
     .from("profiles")
-    .select("id, username, bio, avatar_url, created_at")
+    .select<ProfileRow>("id, username, bio, avatar_url, created_at")
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle<ProfileRow>();
 
   if (profErr) console.error("profile fetch error:", profErr);
   if (!profile) return notFound();
@@ -142,9 +147,9 @@ export default async function PublicProfilePage({ params }: Props) {
     { count: followingCount },
     { data: uploads, error: upErr },
   ] = await Promise.all([
-    supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", id),
-    supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", id),
-    supabase
+    pocketbase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", id),
+    pocketbase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", id),
+    pocketbase
       .from("music_files")
       .select("*")
       .eq("uploaded_by", id)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import { useRouter } from "next/navigation";
 import { KeyRound, Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
@@ -17,10 +17,10 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // When the user lands here from the email link, Supabase establishes a recovery session.
+    // When the user lands here from the email link, pocketbase establishes a recovery session.
     // We can just mark ready after a session check.
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await pocketbase.auth.getSession();
       // If session is null, they likely opened this page without the email link
       setReady(true);
     })();
@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
     if (pw !== confirm) return alert("Passwords do not match.");
 
     setSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: pw });
+    const { error } = await pocketbase.auth.updateUser({ password: pw });
     setSaving(false);
 
     if (error) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 import {
   Loader2,
   Users,
@@ -23,7 +23,7 @@ type ProfileRow = {
 type FollowRowFollowing = {
   following_id: string;
   created_at?: string;
-  // Supabase may return joined relations as ARRAY depending on FK shape
+  // pocketbase may return joined relations as ARRAY depending on FK shape
   profiles?: ProfileRow[] | ProfileRow | null;
 };
 
@@ -72,11 +72,11 @@ export default function FollowingPage() {
 
   const fetchCounts = async (userId: string) => {
     const [{ count: followingC }, { count: followersC }] = await Promise.all([
-      supabase
+      pocketbase
         .from("follows")
         .select("*", { count: "exact", head: true })
         .eq("follower_id", userId),
-      supabase
+      pocketbase
         .from("follows")
         .select("*", { count: "exact", head: true })
         .eq("following_id", userId),
@@ -95,9 +95,9 @@ export default function FollowingPage() {
     const to = from + PAGE_SIZE - 1;
 
     if (which === "following") {
-      const { data, error } = await supabase
+      const { data, error } = await pocketbase
         .from("follows")
-        .select(
+        .select<FollowRowFollowing>(
           `
           following_id,
           created_at,
@@ -131,9 +131,9 @@ export default function FollowingPage() {
     }
 
     // followers tab
-    const { data, error } = await supabase
+    const { data, error } = await pocketbase
       .from("follows")
-      .select(
+      .select<FollowRowFollowers>(
         `
         follower_id,
         created_at,
@@ -169,12 +169,12 @@ export default function FollowingPage() {
     (async () => {
       setLoading(true);
 
-      const { data: userData, error } = await supabase.auth.getUser();
+      const { data: userData, error } = await pocketbase.auth.getUser();
       if (error) console.error("getUser error:", error);
 
       const user = userData?.user;
       if (!user) {
-        router.push("/login?redirect=/following");
+        router.push("/login?redirect=/connections");
         return;
       }
 
@@ -188,7 +188,7 @@ export default function FollowingPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await pocketbase.auth.getUser();
       const user = userData?.user;
       if (!user) return;
 
@@ -202,7 +202,7 @@ export default function FollowingPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await pocketbase.auth.getUser();
       const user = userData?.user;
       if (!user) return;
 
@@ -223,10 +223,10 @@ export default function FollowingPage() {
   }, [list, q]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
         {/* Header */}
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-7 shadow-xl">
+        <div className="hover-shine rounded-3xl border border-white/10 bg-white/[0.055] p-7 shadow-xl">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-extrabold flex items-center gap-3">
@@ -378,6 +378,24 @@ export default function FollowingPage() {
         <p className="text-xs text-gray-500">
           Pagination is {PAGE_SIZE} per page so it stays fast even with lots of users.
         </p>
+
+        <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Find more creators</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Browse creator leaderboards and follow profiles that match your musical taste.
+              </p>
+            </div>
+            <Link
+              href="/creators"
+              className="tap inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-5 py-3 font-bold shadow-lg transition hover:brightness-110"
+            >
+              Explore creators
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
       </div>
     </main>
   );

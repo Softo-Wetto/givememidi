@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Star, Loader2 } from "lucide-react";
-import { supabase } from "../../lib/supbaseClient";
+import { pocketbase } from "../../lib/pocketbaseClient";
 
 type Props = {
   midiId: string;
@@ -24,7 +24,7 @@ export function RatingStars({ midiId, compact }: Props) {
     let mounted = true;
 
     const load = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await pocketbase.auth.getSession();
       const uid = data.session?.user?.id ?? null;
 
       if (!mounted) return;
@@ -36,7 +36,7 @@ export function RatingStars({ midiId, compact }: Props) {
         return;
       }
 
-      const { data: r, error } = await supabase
+      const { data: r, error } = await pocketbase
         .from("midi_ratings")
         .select("rating")
         .eq("midi_id", midiId)
@@ -58,7 +58,7 @@ export function RatingStars({ midiId, compact }: Props) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_evt, session) => {
+    } = pocketbase.auth.onAuthStateChange((_evt, session) => {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
       // reload rating when auth changes
@@ -87,7 +87,7 @@ export function RatingStars({ midiId, compact }: Props) {
     setSaving(true);
     try {
       // Upsert one rating per user per midi
-      const { error } = await supabase
+      const { error } = await pocketbase
         .from("midi_ratings")
         .upsert(
           { midi_id: midiId, user_id: userId, rating: value },
@@ -109,7 +109,7 @@ export function RatingStars({ midiId, compact }: Props) {
     if (!userId) return;
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await pocketbase
         .from("midi_ratings")
         .delete()
         .eq("midi_id", midiId)
