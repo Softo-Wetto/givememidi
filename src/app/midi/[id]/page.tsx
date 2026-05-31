@@ -8,6 +8,13 @@ import { RatingStars } from "../../components/RatingStars";
 import { ShareButton } from "../../components/ShareButton";
 import { MidiCard } from "../../components/MidiCard";
 import Link from "next/link";
+import { Award, Trophy } from "lucide-react";
+import {
+  calculateCreatorPoints,
+  getCreatorAwards,
+  getCreatorLevel,
+  getLevelProgress,
+} from "@/lib/creator-awards";
 
 
 const pocketbase = createPocketBaseClient();
@@ -18,6 +25,7 @@ type MidiRow = {
   id: string;
   title: string;
   composer: string | null;
+  description?: string | null;
   genre: string | null;
   bpm: number | null;
   midi_url: string;
@@ -25,6 +33,13 @@ type MidiRow = {
   downloads: number | null;
   created_at: string | null;
   uploader?: { id: string; username: string | null } | null;
+};
+type CreatorStats = {
+  uploads: number;
+  downloads: number;
+  totalRatings: number;
+  avgRating: number | null;
+  followers: number;
 };
 
 
@@ -65,6 +80,47 @@ const { data, error } = await pocketbase
       : null;
 
   const ratingAgg: RatingAgg = { avg, count };
+
+  let creatorStats: CreatorStats | null = null;
+  if (data.uploader?.id) {
+    const [{ data: uploaderUploads, error: uploaderUploadsErr }, { count: followersCount, error: followersErr }] =
+      await Promise.all([
+        pocketbase
+          .from("music_files")
+          .select("id, downloads")
+          .eq("uploaded_by", data.uploader.id),
+        pocketbase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("following_id", data.uploader.id),
+      ]);
+
+    if (uploaderUploadsErr) console.error("uploader uploads fetch error:", uploaderUploadsErr);
+    if (followersErr) console.error("uploader followers fetch error:", followersErr);
+
+    const uploaderMidiIds = (uploaderUploads ?? []).map((upload: any) => upload.id);
+    let creatorRatingRows: any[] = [];
+    if (uploaderMidiIds.length > 0) {
+      const { data: ratings, error: creatorRatingsErr } = await pocketbase
+        .from("midi_ratings")
+        .select("midi_id, rating")
+        .in("midi_id", uploaderMidiIds);
+
+      if (creatorRatingsErr) console.error("creator ratings fetch error:", creatorRatingsErr);
+      creatorRatingRows = ratings ?? [];
+    }
+
+    const totalRatings = creatorRatingRows.length;
+    const ratingSum = creatorRatingRows.reduce((sum, row) => sum + (row.rating ?? 0), 0);
+
+    creatorStats = {
+      uploads: uploaderMidiIds.length,
+      downloads: (uploaderUploads ?? []).reduce((sum: number, row: any) => sum + (row.downloads ?? 0), 0),
+      totalRatings,
+      avgRating: totalRatings > 0 ? ratingSum / totalRatings : null,
+      followers: followersCount ?? 0,
+    };
+  }
 
   // increment download count (you may want to move this to a "download click" later)
   await pocketbase
@@ -177,6 +233,17 @@ const { data, error } = await pocketbase
             <Stat label="Formats" value={`MIDI${data.pdf_url ? " + PDF" : ""}`} />
           </div>
 
+          {data.description ? (
+            <div className="mt-8 overflow-hidden rounded-3xl border border-blue-300/15 bg-gradient-to-br from-blue-400/10 via-white/[0.045] to-indigo-400/10 p-6 shadow-xl shadow-blue-950/20">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
+                Arrangement notes
+              </div>
+              <p className="whitespace-pre-wrap text-base leading-8 text-slate-200">
+                {data.description}
+              </p>
+            </div>
+          ) : null}
+
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <a
               href={midiSigned}
@@ -212,6 +279,13 @@ const { data, error } = await pocketbase
             <span className="font-semibold text-white">Quick tip:</span>{" "}
             Use the preview before downloading, then bookmark the file if it belongs in your reference library.
           </div>
+
+          {creatorStats ? (
+            <CreatorAwardPanel
+              username={data.uploader?.username ?? "Anonymous"}
+              stats={creatorStats}
+            />
+          ) : null}
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -269,6 +343,62 @@ const { data, error } = await pocketbase
         ) : null}
       </div>
     </main>
+  );
+}
+
+function CreatorAwardPanel({
+  username,
+  stats,
+}: {
+  username: string;
+  stats: CreatorStats;
+}) {
+  const points = calculateCreatorPoints(stats);
+  const level = getCreatorLevel(points);
+  const progress = getLevelProgress(points);
+  const awards = getCreatorAwards(stats);
+
+  return (
+    <div className="mt-6 rounded-3xl border border-yellow-300/15 bg-gradient-to-br from-yellow-400/12 via-white/[0.045] to-blue-500/10 p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-300/25 bg-yellow-300/10 text-yellow-200">
+            <Trophy size={24} />
+          </div>
+          <div>
+            <p className="text-sm text-slate-400">{username} creator level</p>
+            <h3 className="text-xl font-black text-white">{level.label}</h3>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Points</p>
+          <p className="text-2xl font-black text-yellow-100">{points}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-cyan-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-slate-400">
+        {level.nextLabel ? `${level.nextPoints! - points} points to ${level.nextLabel}` : "Highest creator level reached"}
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {awards.map((award) => (
+          <span
+            key={award.label}
+            title={award.hint}
+            className="inline-flex items-center gap-1.5 rounded-full border border-yellow-300/15 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-100"
+          >
+            <Award size={13} />
+            {award.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

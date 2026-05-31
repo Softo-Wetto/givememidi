@@ -13,7 +13,9 @@ import {
   FileText,
   ArrowRight,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
+import { calculateCreatorPoints, getCreatorLevel } from "@/lib/creator-awards";
 
 type UploadRow = {
   id: string;
@@ -54,7 +56,9 @@ export default function MyUploadsPage() {
     const totalDownloads = rows.reduce((sum, row) => sum + (row.downloads ?? 0), 0);
     const withPdf = rows.filter((row) => row.pdf_url).length;
     const genres = new Set(rows.map((row) => row.genre).filter(Boolean)).size;
-    return { totalDownloads, withPdf, genres };
+    const points = calculateCreatorPoints({ uploads: rows.length, downloads: totalDownloads });
+    const level = getCreatorLevel(points).label;
+    return { totalDownloads, withPdf, genres, points, level };
   }, [rows]);
 
   const GENRES = useMemo(
@@ -241,11 +245,12 @@ export default function MyUploadsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-3 sm:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <UploadStat icon={<Music2 size={18} />} label="Uploads" value={String(rows.length)} />
           <UploadStat icon={<TrendingUp size={18} />} label="Downloads" value={String(uploadStats.totalDownloads)} />
           <UploadStat icon={<FileText size={18} />} label="With PDF" value={String(uploadStats.withPdf)} />
           <UploadStat icon={<UploadCloud size={18} />} label="Genres" value={String(uploadStats.genres)} />
+          <UploadStat icon={<Trophy size={18} />} label={uploadStats.level} value={`${uploadStats.points} pts`} />
         </section>
 
         {/* Filters */}

@@ -9,6 +9,7 @@ import type { MusicFile } from "@/lib/pocketbase/types";
 export default function UploadClient() {
   const [title, setTitle] = useState("");
   const [composer, setComposer] = useState("");
+  const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
   const [bpm, setBpm] = useState<number | "">("");
   const [midi, setMidi] = useState<File | null>(null);
@@ -101,7 +102,7 @@ export default function UploadClient() {
   );
 
   const canSubmit = title.trim().length > 0 && !!midi && !loading;
-  const completion = [title.trim(), composer.trim(), genre, bpm !== "", midi, pdf].filter(Boolean).length;
+  const completion = [title.trim(), composer.trim(), description.trim(), genre, bpm !== "", midi, pdf].filter(Boolean).length;
 
   const upload = async () => {
     if (!midi || !title.trim()) {
@@ -122,6 +123,7 @@ export default function UploadClient() {
       const form = new FormData();
       form.append("title", title);
       form.append("composer", composer || "");
+      form.append("description", description.trim());
       form.append("genre", genre || "");
       if (bpm !== "") form.append("bpm", String(bpm));
       form.append("downloads", "0");
@@ -146,6 +148,7 @@ export default function UploadClient() {
       alert("Upload successful!");
       setTitle("");
       setComposer("");
+      setDescription("");
       setGenre("");
       setBpm("");
       setMidi(null);
@@ -190,12 +193,12 @@ export default function UploadClient() {
             <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-200">Upload readiness</span>
-                <span className="text-slate-400">{completion}/6</span>
+                <span className="text-slate-400">{completion}/7</span>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300 transition-all"
-                  style={{ width: `${Math.max(8, (completion / 6) * 100)}%` }}
+                  style={{ width: `${Math.max(8, (completion / 7) * 100)}%` }}
                 />
               </div>
             </div>
@@ -265,6 +268,24 @@ export default function UploadClient() {
                   placeholder="120"
                 />
               </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm text-gray-300 mb-1">
+                Description <span className="text-gray-500">(optional)</span>
+              </label>
+              <textarea
+                rows={4}
+                maxLength={900}
+                className="w-full resize-none p-3 rounded-xl bg-gray-900/60 border border-gray-700
+                  focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/40"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add notes about the arrangement, difficulty, instruments, source, or performance tips."
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                {description.trim().length}/900. A good description helps listeners know why your upload is useful.
+              </p>
             </div>
 
             {/* Files */}
@@ -403,6 +424,10 @@ export default function UploadClient() {
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-400" />
                   Choose a genre from the list
                 </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                  Add a description to earn more trust from listeners
+                </li>
               </ul>
             </div>
 
@@ -415,6 +440,16 @@ export default function UploadClient() {
                 After upload, your MIDI appears in <span className="text-white font-semibold">All MIDI</span>.
                 If you attached a PDF, cards show a <span className="text-green-300 font-semibold">PDF Available</span> badge,
                 and the details page will include a sheet music preview + download.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-yellow-500/15 to-orange-500/15 border border-yellow-300/15 rounded-3xl p-6 shadow-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <Music2 className="text-yellow-200" size={18} />
+                <h3 className="font-bold text-lg">Creator points</h3>
+              </div>
+              <p className="text-sm text-gray-300 mt-2 leading-relaxed">
+                Every upload earns points. Downloads, ratings, and followers push your creator level higher on profiles and leaderboards.
               </p>
             </div>
           </aside>

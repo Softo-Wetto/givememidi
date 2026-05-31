@@ -21,6 +21,7 @@ type MusicFileRow = {
   id: string;
   title: string;
   composer: string | null;
+  description?: string | null;
   genre: string | null;
   bpm: number | null;
   midi_url: string;
@@ -42,6 +43,7 @@ export default function EditMidiPage() {
   // form
   const [title, setTitle] = useState("");
   const [composer, setComposer] = useState("");
+  const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
   const [bpm, setBpm] = useState<number | "">("");
 
@@ -143,7 +145,7 @@ export default function EditMidiPage() {
 
       const { data, error } = await pocketbase
         .from("music_files")
-        .select<MusicFileRow>("id, title, composer, genre, bpm, midi_url, pdf_url, uploaded_by")
+        .select<MusicFileRow>("id, title, composer, description, genre, bpm, midi_url, pdf_url, uploaded_by")
         .eq("id", id)
         .single<MusicFileRow>();
 
@@ -165,6 +167,7 @@ export default function EditMidiPage() {
       // seed form
       setTitle(data.title ?? "");
       setComposer(data.composer ?? "");
+      setDescription(data.description ?? "");
       setGenre(data.genre ?? "");
       setBpm(data.bpm ?? "");
 
@@ -189,6 +192,7 @@ export default function EditMidiPage() {
       const updates = {
         title: title.trim(),
         composer: composer.trim() ? composer.trim() : null,
+        description: description.trim() ? description.trim() : null,
         genre: genre || null,
         bpm: bpm === "" ? null : bpm,
       };
@@ -200,6 +204,7 @@ export default function EditMidiPage() {
         const form = new FormData();
         form.set("title", updates.title);
         form.set("composer", updates.composer ?? "");
+        form.set("description", updates.description ?? "");
         form.set("genre", updates.genre ?? "");
         form.set("bpm", updates.bpm === null ? "" : String(updates.bpm));
         if (newMidi) form.set("midi_file", newMidi);
@@ -389,6 +394,22 @@ export default function EditMidiPage() {
                 placeholder="120"
               />
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm text-gray-300 mb-1">
+              Description <span className="text-gray-500">(optional)</span>
+            </label>
+            <textarea
+              rows={4}
+              maxLength={900}
+              className="w-full resize-none p-3 rounded-xl bg-gray-900/60 border border-gray-700
+                focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/40"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add arrangement notes, difficulty, instrument suggestions, or performance tips."
+            />
+            <p className="mt-2 text-xs text-gray-500">{description.trim().length}/900</p>
           </div>
 
           {/* Replace files */}

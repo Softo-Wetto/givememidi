@@ -19,9 +19,16 @@ import {
   ShieldCheck,
   UploadCloud,
   Star,
+  Trophy,
   TrendingUp,
   Music2,
 } from "lucide-react";
+import {
+  calculateCreatorPoints,
+  getCreatorAwards,
+  getCreatorLevel,
+  getLevelProgress,
+} from "@/lib/creator-awards";
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
@@ -43,26 +50,6 @@ type ProfileRow = {
 };
 type UploadStatRow = { id: string; downloads: number | null };
 type RatingRow = { midi_id: string; rating: number | null };
-
-function badgeList(args: {
-  uploads: number;
-  totalDownloads: number;
-  avgRating: number | null;
-  totalRatings: number;
-}) {
-  const { uploads, totalDownloads, avgRating, totalRatings } = args;
-
-  const badges: { label: string; hint: string }[] = [];
-
-  if (uploads >= 10) badges.push({ label: "Prolific Uploader", hint: "10+ uploads" });
-  if (totalDownloads >= 250) badges.push({ label: "Trending", hint: "250+ total downloads" });
-  if (avgRating !== null && totalRatings >= 5 && avgRating >= 4.5)
-    badges.push({ label: "Top Rated", hint: "4.5+ avg (5+ ratings)" });
-
-  if (badges.length === 0) badges.push({ label: "New Creator", hint: "Just getting started" });
-
-  return badges.slice(0, 4);
-}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -109,11 +96,23 @@ export default function ProfilePage() {
     return { label, score };
   }, [newPassword]);
 
+  const creatorPoints = useMemo(
+    () =>
+      calculateCreatorPoints({
+        uploads: totalUploads,
+        downloads: totalDownloads,
+        avgRating: overallAvg,
+        totalRatings,
+      }),
+    [totalUploads, totalDownloads, overallAvg, totalRatings]
+  );
+  const creatorLevel = useMemo(() => getCreatorLevel(creatorPoints), [creatorPoints]);
+  const levelProgress = useMemo(() => getLevelProgress(creatorPoints), [creatorPoints]);
   const badges = useMemo(
     () =>
-      badgeList({
+      getCreatorAwards({
         uploads: totalUploads,
-        totalDownloads,
+        downloads: totalDownloads,
         avgRating: overallAvg,
         totalRatings,
       }),
@@ -356,8 +355,8 @@ export default function ProfilePage() {
                     <span
                       key={b.label}
                       title={b.hint}
-                      className="px-3 py-1 rounded-full text-xs font-semibold
-                                 bg-white/5 border border-white/10 text-gray-200"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
+                                 bg-yellow-300/10 border border-yellow-300/15 text-yellow-100"
                     >
                       ✨ {b.label}
                     </span>
@@ -393,6 +392,20 @@ export default function ProfilePage() {
 
           {/* Stats */}
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-yellow-300/15 bg-gradient-to-br from-yellow-300/10 to-cyan-300/10 p-4 flex items-center gap-3 sm:col-span-2">
+              <Trophy size={20} className="text-yellow-200" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Creator level</p>
+                <p className="text-lg font-semibold">{creatorPoints} pts - {creatorLevel.label}</p>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-cyan-300"
+                    style={{ width: `${levelProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
               <Music2 size={18} className="text-emerald-300" />
               <div>

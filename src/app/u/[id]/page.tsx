@@ -5,7 +5,13 @@ import Link from "next/link";
 import FollowButton from "./FollowButton";
 import { MidiCard } from "../../components/MidiCard";
 import { MidiRowScroller } from "../../components/MidiRowScroller";
-import { Star, TrendingUp, Music2, Users } from "lucide-react";
+import { Star, TrendingUp, Music2, Trophy, Users } from "lucide-react";
+import {
+  calculateCreatorPoints,
+  getCreatorAwards,
+  getCreatorLevel,
+  getLevelProgress,
+} from "@/lib/creator-awards";
 
 const pocketbase = createPocketBaseClient();
 
@@ -52,28 +58,6 @@ async function fetchRatingAggForMidiIds(ids: string[]) {
     });
   }
   return map;
-}
-
-function badgeList(args: {
-  uploads: number;
-  totalDownloads: number;
-  avgRating: number | null;
-  totalRatings: number;
-  followers: number;
-}) {
-  const { uploads, totalDownloads, avgRating, totalRatings, followers } = args;
-
-  const badges: { label: string; hint: string }[] = [];
-
-  if (followers >= 25) badges.push({ label: "Rising Creator", hint: "25+ followers" });
-  if (uploads >= 10) badges.push({ label: "Prolific Uploader", hint: "10+ uploads" });
-  if (totalDownloads >= 250) badges.push({ label: "Trending", hint: "250+ total downloads" });
-  if (avgRating !== null && totalRatings >= 5 && avgRating >= 4.5)
-    badges.push({ label: "Top Rated", hint: "4.5+ avg (5+ ratings)" });
-
-  if (badges.length === 0) badges.push({ label: "New Creator", hint: "Just getting started" });
-
-  return badges.slice(0, 4);
 }
 
 function StatCard({
@@ -176,13 +160,17 @@ export default async function PublicProfilePage({ params }: Props) {
   const sumStars = Array.from(ratingMap.values()).reduce((sum, a) => sum + a.sum, 0);
   const overallAvg = totalRatings > 0 ? sumStars / totalRatings : null;
 
-  const badges = badgeList({
+  const awardInput = {
     uploads: totalUploads,
-    totalDownloads,
+    downloads: totalDownloads,
     avgRating: overallAvg,
     totalRatings,
     followers: followersCount ?? 0,
-  });
+  };
+  const points = calculateCreatorPoints(awardInput);
+  const level = getCreatorLevel(points);
+  const progress = getLevelProgress(points);
+  const badges = getCreatorAwards(awardInput);
 
   // Sections
   const latestUploads = (uploads ?? []).slice(0, 15);
@@ -248,8 +236,8 @@ export default async function PublicProfilePage({ params }: Props) {
                     <span
                       key={b.label}
                       title={b.hint}
-                      className="px-3 py-1 rounded-full text-xs font-semibold
-                                 bg-white/5 border border-white/10 text-gray-200"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
+                                 bg-yellow-300/10 border border-yellow-300/15 text-yellow-100"
                     >
                       ✨ {b.label}
                     </span>
@@ -280,6 +268,29 @@ export default async function PublicProfilePage({ params }: Props) {
             <StatCard icon={<Users size={18} className="text-indigo-300" />} label="Following" value={String(followingCount ?? 0)} />
             <StatCard icon={<Music2 size={18} className="text-emerald-300" />} label="Uploads" value={String(totalUploads)} />
             <StatCard icon={<TrendingUp size={18} className="text-yellow-300" />} label="Total downloads" value={String(totalDownloads)} />
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-yellow-300/15 bg-gradient-to-r from-yellow-400/10 to-cyan-400/10 p-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-300/20 bg-yellow-300/10 text-yellow-200">
+                  <Trophy size={22} />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Creator points</p>
+                  <p className="text-xl font-black text-white">{points} pts - {level.label}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-400">
+                {level.nextLabel ? `${level.nextPoints! - points} points to ${level.nextLabel}` : "Highest creator level reached"}
+              </p>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-yellow-300 to-cyan-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
 
           {/* Rating summary */}

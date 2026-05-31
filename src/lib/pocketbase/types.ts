@@ -32,6 +32,7 @@ export type UserProfile = PocketBaseRecord & {
 export type MusicFile = PocketBaseRecord & {
   title: string;
   composer: string | null;
+  description?: string | null;
   genre: string | null;
   bpm: number | null;
   midi_url: string | null;

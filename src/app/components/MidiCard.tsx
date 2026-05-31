@@ -160,9 +160,6 @@ function PdfArtwork({
         </span>
       </div>
 
-      <div className="absolute left-20 right-4 top-5 truncate text-right text-xs font-semibold text-white/45">
-        {composer || title}
-      </div>
     </div>
   );
 }

@@ -228,6 +228,7 @@ async function main() {
       text("legacy_id"),
       text("title", { required: true }),
       text("composer"),
+      text("description"),
       text("genre"),
       number("bpm"),
       text("midi_url"),

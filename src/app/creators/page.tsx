@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
-import { Crown, Music2, Sparkles, Star, TrendingUp, Upload, Users } from "lucide-react";
+import { Award, Crown, Music2, Sparkles, Star, TrendingUp, Trophy, Upload, Users } from "lucide-react";
+import {
+  calculateCreatorPoints,
+  getCreatorAwards,
+  getCreatorLevel,
+} from "@/lib/creator-awards";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +25,8 @@ type LeaderRow = Profile & {
   downloads: number;
   avgRating: number | null;
   ratingCount: number;
+  points: number;
+  level: string;
 };
 
 function formatDate(iso?: string | null) {
@@ -29,19 +36,6 @@ function formatDate(iso?: string | null) {
     month: "short",
     day: "2-digit",
   }).format(new Date(iso));
-}
-
-function badgeList(creator: LeaderRow) {
-  const badges: { label: string; hint: string }[] = [];
-  if (creator.followers >= 25) badges.push({ label: "Rising", hint: "25+ followers" });
-  if (creator.uploads >= 10) badges.push({ label: "Prolific", hint: "10+ uploads" });
-  if (creator.downloads >= 250) badges.push({ label: "Trending", hint: "250+ downloads" });
-  if (creator.avgRating !== null && creator.ratingCount >= 10 && creator.avgRating >= 4.5) {
-    badges.push({ label: "Top rated", hint: "4.5+ average" });
-  }
-
-  if (badges.length === 0) badges.push({ label: "New creator", hint: "Just getting started" });
-  return badges.slice(0, 3);
 }
 
 export default async function CreatorsPage() {
@@ -131,6 +125,14 @@ export default async function CreatorsPage() {
     const downloads = downloadsMap.get(profile.id) ?? 0;
     const agg = creatorAgg.get(profile.id) ?? { sum: 0, count: 0 };
 
+    const points = calculateCreatorPoints({
+      uploads,
+      downloads,
+      totalRatings: agg.count,
+      avgRating: agg.count > 0 ? agg.sum / agg.count : null,
+      followers,
+    });
+
     return {
       ...profile,
       uploads,
@@ -138,12 +140,15 @@ export default async function CreatorsPage() {
       downloads,
       avgRating: agg.count > 0 ? agg.sum / agg.count : null,
       ratingCount: agg.count,
+      points,
+      level: getCreatorLevel(points).label,
     };
   });
 
   const mostFollowed = leaders.slice().sort((a, b) => b.followers - a.followers).slice(0, 10);
   const mostUploads = leaders.slice().sort((a, b) => b.uploads - a.uploads).slice(0, 10);
   const mostDownloaded = leaders.slice().sort((a, b) => b.downloads - a.downloads).slice(0, 10);
+  const mostAwarded = leaders.slice().sort((a, b) => b.points - a.points).slice(0, 10);
   const topRated = leaders
     .filter((creator) => creator.ratingCount >= 10)
     .slice()
@@ -153,6 +158,7 @@ export default async function CreatorsPage() {
   const totalDownloads = leaders.reduce((sum, creator) => sum + creator.downloads, 0);
   const totalUploads = leaders.reduce((sum, creator) => sum + creator.uploads, 0);
   const activeCreators = leaders.filter((creator) => creator.uploads > 0).length;
+  const totalPoints = leaders.reduce((sum, creator) => sum + creator.points, 0);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
@@ -169,11 +175,12 @@ export default async function CreatorsPage() {
             Find active uploaders, high-rated arrangers, and the profiles worth following next.
           </p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-4">
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <CreatorStat icon={<Users size={18} />} label="Creators" value={String(leaders.length)} />
             <CreatorStat icon={<Music2 size={18} />} label="Active" value={String(activeCreators)} />
             <CreatorStat icon={<Upload size={18} />} label="Uploads" value={String(totalUploads)} />
             <CreatorStat icon={<TrendingUp size={18} />} label="Downloads" value={String(totalDownloads)} />
+            <CreatorStat icon={<Trophy size={18} />} label="Points" value={String(totalPoints)} />
           </div>
         </div>
       </section>
@@ -192,6 +199,13 @@ export default async function CreatorsPage() {
           icon={<Upload className="text-emerald-300" size={18} />}
           rows={mostUploads}
           metricLabel={(creator) => `${creator.uploads} uploads`}
+        />
+        <Leaderboard
+          title="Most awarded"
+          subtitle="Creators earning the most points across uploads, ratings, downloads, and followers."
+          icon={<Trophy className="text-yellow-300" size={18} />}
+          rows={mostAwarded}
+          metricLabel={(creator) => `${creator.points} pts`}
         />
         <Leaderboard
           title="Most downloaded"
@@ -283,17 +297,24 @@ function Leaderboard({
 
               <div className="shrink-0 text-right">
                 <div className="text-sm font-bold text-white">{metricLabel(creator)}</div>
-                <div className="text-xs text-gray-500">Since {formatDate(creator.created_at)}</div>
+                <div className="text-xs text-gray-500">{creator.level}</div>
               </div>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {badgeList(creator).map((badge) => (
+              {getCreatorAwards({
+                uploads: creator.uploads,
+                downloads: creator.downloads,
+                totalRatings: creator.ratingCount,
+                avgRating: creator.avgRating,
+                followers: creator.followers,
+              }).slice(0, 3).map((badge) => (
                 <span
                   key={badge.label}
                   title={badge.hint}
-                  className="rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-yellow-300/15 bg-yellow-300/10 px-2.5 py-1 text-[11px] font-semibold text-yellow-100"
                 >
+                  <Award size={12} />
                   {badge.label}
                 </span>
               ))}

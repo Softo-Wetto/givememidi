@@ -13,6 +13,7 @@ type MidiRow = {
   id: string;
   title: string;
   composer: string | null;
+  description?: string | null;
   downloads: number | null;
   pdf_url: string | null;
   created_at?: string | null;
@@ -137,13 +138,13 @@ export default function AllMidiClientPage() {
   const buildQuery = () => {
     let query = pocketbase
       .from("music_files")
-      .select("id,title,composer,downloads,pdf_url,created_at,genre,bpm");
+      .select("id,title,composer,description,downloads,pdf_url,created_at,genre,bpm");
 
     if (genre) query = query.eq("genre", genre);
 
     const q = debouncedSearch.trim();
     if (q) {
-      query = query.or(`title.ilike.%${q}%,composer.ilike.%${q}%,genre.ilike.%${q}%`);
+      query = query.or(`title.ilike.%${q}%,composer.ilike.%${q}%,description.ilike.%${q}%,genre.ilike.%${q}%`);
     }
 
     query = applySort(query);
