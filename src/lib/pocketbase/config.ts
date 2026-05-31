@@ -1,7 +1,7 @@
 export const POCKETBASE_URL =
   process.env.NEXT_PUBLIC_POCKETBASE_URL?.replace(/\/$/, "") ||
   process.env.POCKETBASE_URL?.replace(/\/$/, "") ||
-  "https://givememidi.duckdns.org";
+  "https://api-midi.softowetto.com";
 
 export const POCKETBASE_AUTH_COOKIE = "givememidi_pb_auth";
 

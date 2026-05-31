@@ -26,7 +26,7 @@ loadEnvFile(".env.local");
 const pocketBaseUrl =
   process.env.POCKETBASE_URL ||
   process.env.NEXT_PUBLIC_POCKETBASE_URL ||
-  "https://givememidi.duckdns.org";
+  "https://api-midi.softowetto.com";
 const superuserEmail = process.env.POCKETBASE_SUPERUSER_EMAIL;
 const superuserPassword = process.env.POCKETBASE_SUPERUSER_PASSWORD;
 const legacyStorageBaseUrl = process.env.LEGACY_PUBLIC_STORAGE_URL?.replace(/\/$/, "");

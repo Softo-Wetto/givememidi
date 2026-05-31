@@ -38,42 +38,12 @@ export function MidiCard({
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent opacity-0 transition group-hover:opacity-100" />
 
-      <div className="absolute right-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute right-3 top-3 z-20" onClick={(e) => e.stopPropagation()}>
         <BookmarkButton midiId={id} />
       </div>
 
       <Link href={`/midi/${id}`} className="flex h-full flex-col p-4">
-        <div className="relative mb-4 h-44 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-black">
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:22px_22px] opacity-60" />
-          <div className="absolute inset-x-4 bottom-5 flex h-16 items-end gap-1">
-            {Array.from({ length: 18 }).map((_, i) => (
-              <span
-                key={i}
-                className="motion-bar block flex-1 rounded-t bg-gradient-to-t from-blue-500/45 to-cyan-300/75"
-                style={{
-                  height: `${25 + ((i * 19) % 58)}%`,
-                  animationDelay: `${i * 55}ms`,
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-blue-200 ring-1 ring-white/10">
-            <Music2 size={22} />
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
-            <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-xs font-semibold text-slate-200 backdrop-blur">
-              {genre || "MIDI"}
-            </span>
-            {pdfUrl ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-200">
-                <FileText size={12} />
-                PDF
-              </span>
-            ) : null}
-          </div>
-        </div>
+        <PdfArtwork title={title} composer={composer} genre={genre} hasPdf={Boolean(pdfUrl)} />
 
         <div className="min-h-[72px]">
           <h3 className="line-clamp-2 text-lg font-bold leading-snug text-white transition group-hover:text-blue-100">
@@ -116,5 +86,83 @@ export function MidiCard({
         </div>
       </Link>
     </motion.article>
+  );
+}
+
+function PdfArtwork({
+  title,
+  composer,
+  genre,
+  hasPdf,
+}: {
+  title: string;
+  composer?: string | null;
+  genre?: string | null;
+  hasPdf: boolean;
+}) {
+  return (
+    <div className="pdf-card-art relative mb-4 h-44 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-black">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.20),transparent_44%),linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:auto,22px_22px,22px_22px]" />
+
+      <div className="absolute left-1/2 top-5 h-[142px] w-[104px] -translate-x-1/2 rounded-lg border border-slate-200/80 bg-slate-100 shadow-2xl shadow-blue-950/40 transition duration-300 group-hover:-translate-y-1 group-hover:rotate-[-1deg]">
+        <div className="absolute right-0 top-0 h-0 w-0 border-l-[18px] border-t-[18px] border-l-slate-300 border-t-white" />
+        <div className="px-4 pt-5">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white">
+              <FileText size={15} />
+            </div>
+            <div>
+              <div className="h-1.5 w-10 rounded-full bg-slate-800" />
+              <div className="mt-1 h-1 w-7 rounded-full bg-slate-400" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="h-1.5 w-full rounded-full bg-slate-300" />
+            <div className="h-1.5 w-10/12 rounded-full bg-slate-300" />
+            <div className="h-1.5 w-11/12 rounded-full bg-slate-300" />
+            <div className="h-1.5 w-8/12 rounded-full bg-slate-300" />
+          </div>
+
+          <div className="mt-4 grid grid-cols-8 gap-1">
+            {Array.from({ length: 32 }).map((_, index) => (
+              <span
+                key={index}
+                className="h-1 rounded-full bg-slate-700/80"
+                style={{ opacity: 0.28 + ((index * 7) % 5) * 0.12 }}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 h-7 rounded-md border border-slate-300 bg-white/70">
+            <div className="h-full w-2/3 rounded-l-md bg-blue-500/20" />
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-blue-200 ring-1 ring-white/10 backdrop-blur">
+        <Music2 size={22} />
+      </div>
+
+      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
+        <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-xs font-semibold text-slate-200 backdrop-blur">
+          {genre || "MIDI"}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+            hasPdf
+              ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200"
+              : "border-blue-300/20 bg-blue-400/10 text-blue-100"
+          }`}
+        >
+          <FileText size={12} />
+          {hasPdf ? "PDF" : "Score"}
+        </span>
+      </div>
+
+      <div className="absolute left-20 right-4 top-5 truncate text-right text-xs font-semibold text-white/45">
+        {composer || title}
+      </div>
+    </div>
   );
 }

@@ -151,6 +151,23 @@ select {
   animation: midi-bar 1.8s ease-in-out infinite;
 }
 
+.pdf-card-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.12) 46%,
+    transparent 54%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: pdf-scan 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
 @keyframes midi-bar {
   0%,
   100% {
@@ -160,6 +177,16 @@ select {
   50% {
     transform: scaleY(1);
     opacity: 1;
+  }
+}
+
+@keyframes pdf-scan {
+  0%,
+  54% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
   }
 }
 @keyframes shimmer {
@@ -182,6 +209,9 @@ select {
     animation: none !important;
   }
   .motion-bar {
+    animation: none !important;
+  }
+  .pdf-card-art::after {
     animation: none !important;
   }
 }

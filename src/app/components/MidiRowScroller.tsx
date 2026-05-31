@@ -60,7 +60,7 @@ export function MidiRowScroller({
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el || event.pointerType === "mouse" && event.button !== 0) return;
-    if ((event.target as HTMLElement).closest("button, input, textarea, select")) return;
+    if ((event.target as HTMLElement).closest("a, button, input, textarea, select")) return;
 
     drag.current = {
       active: true,
