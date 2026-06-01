@@ -366,8 +366,9 @@ function CreatorAwardPanel({
             <Trophy size={24} />
           </div>
           <div>
-            <p className="text-sm text-slate-400">{username} creator level</p>
+            <p className="text-sm text-slate-400">Uploader reward level</p>
             <h3 className="text-xl font-black text-white">{level.label}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">Awarded to {username}</p>
           </div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">

@@ -1,18 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { pocketbase } from "../../lib/pocketbaseClient";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import {
-  Loader,
-  Bookmark,
-  Search,
-  Trash2,
-  Music2,
   ArrowRight,
+  Bookmark,
+  CalendarDays,
+  Copy,
+  Download,
+  FileText,
+  Filter,
+  Library,
+  Loader,
+  Music2,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
   Star,
+  Trash2,
+  X,
 } from "lucide-react";
 
 type MidiRow = {
@@ -20,6 +29,8 @@ type MidiRow = {
   title: string;
   composer: string | null;
   pdf_url?: string | null;
+  genre?: string | null;
+  downloads?: number | null;
 };
 
 type BookmarkRow = {
@@ -37,17 +48,23 @@ type BookmarkDbRow = {
         title: string;
         composer: string | null;
         pdf_url: string | null;
+        genre: string | null;
+        downloads: number | null;
       }
     | Array<{
         id: string;
         title: string;
         composer: string | null;
         pdf_url: string | null;
+        genre: string | null;
+        downloads: number | null;
       }>
     | null;
 };
 
 type RatingAgg = { sum: number; count: number };
+type SortKey = "recent" | "title" | "composer" | "rating" | "downloads";
+type FilterKey = "all" | "pdf" | "rated";
 
 async function fetchRatingAggForMidiIds(ids: string[]) {
   if (ids.length === 0) return new Map<string, RatingAgg>();
@@ -75,8 +92,13 @@ async function fetchRatingAggForMidiIds(ids: string[]) {
   return map;
 }
 
+function ratingFor(map: Map<string, RatingAgg>, id: string) {
+  const agg = map.get(id);
+  if (!agg || agg.count === 0) return { avg: null as number | null, count: 0 };
+  return { avg: agg.sum / agg.count, count: agg.count };
+}
+
 function RatingDisplay({ avg, count }: { avg: number | null; count: number }) {
-  // 5-star display, half-stars optional later; for now simple fill by rounding
   const filled = avg == null ? 0 : Math.round(avg);
 
   return (
@@ -85,17 +107,12 @@ function RatingDisplay({ avg, count }: { avg: number | null; count: number }) {
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
             key={i}
-            size={16}
-            className={
-              i < filled
-                ? "text-yellow-400 fill-yellow-400"
-                : "text-gray-600"
-            }
+            size={15}
+            className={i < filled ? "fill-yellow-300 text-yellow-300" : "text-slate-700"}
           />
         ))}
       </div>
-
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-slate-400">
         {avg == null ? "No ratings" : `${avg.toFixed(1)} (${count})`}
       </span>
     </div>
@@ -107,18 +124,13 @@ export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState<BookmarkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"recent" | "title" | "composer">("recent");
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [filter, setFilter] = useState<FilterKey>("all");
   const [removingId, setRemovingId] = useState<string | null>(null);
-
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const [ratingMap, setRatingMap] = useState<Map<string, RatingAgg>>(new Map());
 
-  const getAvg = (id: string) => {
-    const agg = ratingMap.get(id);
-    if (!agg || agg.count === 0) return { avgRating: null as number | null, ratingCount: 0 };
-    return { avgRating: agg.sum / agg.count, ratingCount: agg.count };
-  };
-
-  const fetchBookmarks = async () => {
+  const fetchBookmarks = useCallback(async () => {
     setLoading(true);
 
     const { data: userData, error: userErr } = await pocketbase.auth.getUser();
@@ -139,9 +151,11 @@ export default function BookmarksPage() {
           id,
           title,
           composer,
-          pdf_url
+          pdf_url,
+          genre,
+          downloads
         )
-      `
+      `,
       )
       .eq("user_id", userData.user.id)
       .order("created_at", { ascending: false });
@@ -159,52 +173,72 @@ export default function BookmarksPage() {
         const mf = Array.isArray(b.music_files) ? b.music_files[0] : b.music_files;
         if (!mf) return null;
         return {
-          id: b.id as string,
-          created_at: b.created_at as string,
+          id: b.id,
+          created_at: b.created_at,
           midi: {
             id: mf.id,
             title: mf.title,
             composer: mf.composer ?? null,
             pdf_url: mf.pdf_url ?? null,
+            genre: mf.genre ?? null,
+            downloads: mf.downloads ?? 0,
           },
         };
       })
       .filter(Boolean) as BookmarkRow[];
 
     setBookmarks(formatted);
-
-    // ratings: bulk fetch for bookmarked midi ids
-    const ids = formatted.map((b) => b.midi.id);
-    const map = await fetchRatingAggForMidiIds(ids);
-    setRatingMap(map);
-
+    setRatingMap(await fetchRatingAggForMidiIds(formatted.map((b) => b.midi.id)));
     setLoading(false);
-  };
+  }, [router]);
 
   useEffect(() => {
+    // Bookmarks are user-specific client data, so this page hydrates then loads them.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBookmarks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchBookmarks]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const source = q
-      ? bookmarks.filter((b) => {
-      const t = (b.midi.title || "").toLowerCase();
-      const c = (b.midi.composer || "").toLowerCase();
-      return t.includes(q) || c.includes(q);
-    })
-      : bookmarks;
 
-    return source.slice().sort((a, b) => {
-      if (sort === "title") return a.midi.title.localeCompare(b.midi.title);
-      if (sort === "composer") return (a.midi.composer || "").localeCompare(b.midi.composer || "");
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    });
-  }, [bookmarks, query, sort]);
+    return bookmarks
+      .filter((b) => {
+        const rating = ratingFor(ratingMap, b.midi.id);
+        if (filter === "pdf" && !b.midi.pdf_url) return false;
+        if (filter === "rated" && rating.count === 0) return false;
+        if (!q) return true;
+        return [b.midi.title, b.midi.composer, b.midi.genre]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(q));
+      })
+      .sort((a, b) => {
+        if (sort === "title") return a.midi.title.localeCompare(b.midi.title);
+        if (sort === "composer") return (a.midi.composer || "").localeCompare(b.midi.composer || "");
+        if (sort === "rating") {
+          return (ratingFor(ratingMap, b.midi.id).avg ?? -1) - (ratingFor(ratingMap, a.midi.id).avg ?? -1);
+        }
+        if (sort === "downloads") return (b.midi.downloads ?? 0) - (a.midi.downloads ?? 0);
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
+  }, [bookmarks, filter, query, ratingMap, sort]);
+
+  const stats = useMemo(() => {
+    const pdfCount = bookmarks.filter((b) => b.midi.pdf_url).length;
+    const totalDownloads = bookmarks.reduce((sum, b) => sum + (b.midi.downloads ?? 0), 0);
+    const rated = bookmarks
+      .map((b) => ratingFor(ratingMap, b.midi.id))
+      .filter((r) => r.avg !== null);
+    const avgRating =
+      rated.length > 0
+        ? rated.reduce((sum, r) => sum + (r.avg ?? 0), 0) / rated.length
+        : null;
+
+    return { pdfCount, totalDownloads, avgRating };
+  }, [bookmarks, ratingMap]);
 
   const removeBookmark = async (bookmarkId: string) => {
     setRemovingId(bookmarkId);
+    const target = bookmarks.find((b) => b.id === bookmarkId);
     const { error } = await pocketbase.from("bookmarks").delete().eq("id", bookmarkId);
     setRemovingId(null);
 
@@ -214,26 +248,39 @@ export default function BookmarksPage() {
       return;
     }
 
-    // Optimistic UI
     setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
+    if (target) {
+      setRatingMap((prev) => {
+        const next = new Map(prev);
+        next.delete(target.midi.id);
+        return next;
+      });
+    }
   };
 
-  // keep ratingMap in sync if user removes bookmarks
-const bookmarkIdsKey = useMemo(
-  () => bookmarks.map((b) => b.midi.id).join("|"),
-  [bookmarks]
-);
+  const copyBookmarkList = async () => {
+    const text = filtered
+      .map((b) => {
+        const composer = b.midi.composer ? ` by ${b.midi.composer}` : "";
+        return `${b.midi.title}${composer} - /midi/${b.midi.id}`;
+      })
+      .join("\n");
 
-useEffect(() => {
-  const ids = bookmarks.map((b) => b.midi.id);
-  fetchRatingAggForMidiIds(ids).then(setRatingMap);
-}, [bookmarkIdsKey]);
+    try {
+      await navigator.clipboard.writeText(text || "No bookmarks");
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 1800);
+    } catch {
+      setCopyStatus("error");
+      window.setTimeout(() => setCopyStatus("idle"), 1800);
+    }
+  };
 
   if (loading) {
     return (
-      <main className="min-h-[70vh] flex items-center justify-center text-gray-400">
-        <div className="flex items-center gap-2">
-          <Loader className="animate-spin" size={18} />
+      <main className="min-h-[70vh] flex items-center justify-center text-slate-400">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4">
+          <Loader className="animate-spin text-cyan-200" size={18} />
           Loading bookmarks...
         </div>
       </main>
@@ -241,167 +288,255 @@ useEffect(() => {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
-      <div className="max-w-7xl mx-auto px-6 pt-10 pb-20">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-6">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-tight flex items-center gap-3">
-              <Bookmark className="text-blue-400" />
-              Your Bookmarks
-            </h1>
-            <p className="text-gray-400 mt-2">
-              Keep your favorite MIDI files here for quick access.
-            </p>
-          </div>
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-0 h-72 w-[900px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
+      </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-2 rounded-xl bg-white/[0.055] border border-white/10 text-sm text-gray-300">
-              {bookmarks.length} saved
+      <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-10">
+        <section className="hover-shine overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-6 shadow-2xl shadow-black/30 md:p-8">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+                <Bookmark size={16} />
+                Saved library
+              </div>
+              <h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">
+                Your MIDI vault
+              </h1>
+              <p className="mt-3 text-base leading-7 text-slate-400">
+                Keep favorite arrangements, sheet music, and high-rated finds in one clean workspace.
+              </p>
             </div>
 
-            <Link
-              href="/midi"
-              className="group inline-flex items-center gap-2 px-4 py-2 rounded-xl
-                bg-white/5 border border-white/10 hover:bg-white/10 transition"
-            >
-              <Music2 size={16} className="text-gray-300 group-hover:text-white transition" />
-              Browse MIDI
-              <ArrowRight size={16} className="text-gray-400 group-hover:text-white transition" />
-            </Link>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[520px]">
+              <StatCard label="Saved" value={String(bookmarks.length)} icon={<Library size={18} />} />
+              <StatCard label="With PDF" value={String(stats.pdfCount)} icon={<FileText size={18} />} />
+              <StatCard label="Downloads" value={compactNumber(stats.totalDownloads)} icon={<Download size={18} />} />
+              <StatCard label="Avg rating" value={stats.avgRating ? stats.avgRating.toFixed(1) : "-"} icon={<Star size={18} />} />
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Search bar */}
-        <div className="mb-8 grid gap-3 md:grid-cols-[1fr_220px]">
-          <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-cyan-300/30">
-            <Search size={16} className="text-gray-400" />
+        <section className="mt-6 grid gap-3 lg:grid-cols-[1fr_180px_180px_auto]">
+          <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 focus-within:border-cyan-300/40 focus-within:ring-2 focus-within:ring-cyan-300/15">
+            <Search size={17} className="text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your bookmarks (title or composer)…"
-              className="w-full bg-transparent outline-none text-white placeholder:text-gray-500"
+              placeholder="Search title, composer, or genre..."
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
             />
-          </div>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            className="rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-300/30"
-          >
-            <option value="recent">Recently saved</option>
-            <option value="title">Title A-Z</option>
-            <option value="composer">Composer A-Z</option>
-          </select>
-        </div>
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-white"
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            ) : null}
+          </label>
 
-        {/* Empty state */}
-        {bookmarks.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-10 text-center">
-            <p className="text-xl font-semibold">No bookmarks yet</p>
-            <p className="text-gray-400 mt-2">
-              Start bookmarking your favorite MIDI files from the All MIDI page.
-            </p>
+          <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+            <Filter size={16} className="text-cyan-200" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as FilterKey)}
+              className="w-full bg-transparent text-white outline-none"
+            >
+              <option value="all">All saved</option>
+              <option value="pdf">PDF only</option>
+              <option value="rated">Rated</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+            <SlidersHorizontal size={16} className="text-cyan-200" />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="w-full bg-transparent text-white outline-none"
+            >
+              <option value="recent">Recently saved</option>
+              <option value="title">Title A-Z</option>
+              <option value="composer">Composer A-Z</option>
+              <option value="rating">Top rated</option>
+              <option value="downloads">Most downloaded</option>
+            </select>
+          </label>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={copyBookmarkList}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/30 hover:text-white lg:flex-none"
+            >
+              <Copy size={16} />
+              {copyStatus === "copied" ? "Copied" : copyStatus === "error" ? "Copy failed" : "Copy list"}
+            </button>
+
             <Link
               href="/midi"
-              className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl
-                bg-gradient-to-r from-blue-500 to-indigo-500
-                hover:from-blue-400 hover:to-indigo-400 font-semibold shadow-lg transition"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:from-blue-400 hover:to-indigo-400 lg:flex-none"
             >
-              Browse MIDI
-              <ArrowRight size={16} />
+              <Music2 size={16} />
+              Browse
             </Link>
           </div>
-        )}
+        </section>
 
-        {/* No results */}
-        {bookmarks.length > 0 && filtered.length === 0 && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center text-gray-300">
-            No matches for{" "}
-            <span className="font-semibold">&quot;{query.trim()}&quot;</span>
+        {bookmarks.length === 0 ? (
+          <EmptyState />
+        ) : filtered.length === 0 ? (
+          <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.045] p-10 text-center text-slate-300">
+            <p className="text-lg font-bold text-white">No matches found</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Try a different search or clear your filters.
+            </p>
           </div>
-        )}
-
-        {/* Grid */}
-        {filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {filtered.map((b) => {
-              const { avgRating, ratingCount } = getAvg(b.midi.id);
+        ) : (
+          <section className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((bookmark) => {
+              const rating = ratingFor(ratingMap, bookmark.midi.id);
 
               return (
-                <Link
-                  key={b.id}
-                  href={`/midi/${b.midi.id}`}
-                  className="card-lift group bg-white/[0.055] border border-white/10 rounded-2xl p-4
-                    hover:bg-white/10 hover:border-cyan-300/40 transition shadow-lg
-                    flex flex-col gap-3 relative overflow-hidden"
+                <article
+                  key={bookmark.id}
+                  className="card-lift group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] shadow-xl shadow-black/20 transition hover:border-cyan-300/35 hover:bg-white/[0.08]"
                 >
-                  {/* Thumbnail */}
-                  <div className="w-full h-44 bg-white/10 rounded-xl flex items-center justify-center overflow-hidden">
-                    {b.midi.pdf_url ? (
-                      <Image
-                        src="/sheet-music-placeholder.png"
-                        alt="Sheet music available"
-                        width={800}
-                        height={600}
-                        className="object-contain w-5/6 h-5/6"
-                      />
-                    ) : (
-                      <div className="text-gray-400 text-sm font-medium">❌ No PDF</div>
-                    )}
-                  </div>
-
-                  {/* Title + Composer */}
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg truncate">{b.midi.title}</h3>
-                    <p className="text-sm text-gray-400 truncate">
-                      {b.midi.composer || "Unknown Composer"}
-                    </p>
-
-                    {/* ⭐ Rating */}
-                    <div className="mt-2">
-                      <RatingDisplay avg={avgRating} count={ratingCount} />
+                  <div className="relative h-44 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#0f172a,#111827_48%,#020617)]">
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] bg-[size:24px_24px]" />
+                    <div className="absolute left-5 top-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+                      <Music2 size={22} />
+                    </div>
+                    <div className="absolute bottom-5 left-5 right-5">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-semibold text-slate-200 backdrop-blur">
+                        {bookmark.midi.pdf_url ? <FileText size={13} /> : <Sparkles size={13} />}
+                        {bookmark.midi.pdf_url ? "Sheet music saved" : "MIDI only"}
+                      </div>
+                    </div>
+                    <div className="absolute right-5 top-5 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-right backdrop-blur">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Downloads</p>
+                      <p className="text-sm font-black text-white">{compactNumber(bookmark.midi.downloads ?? 0)}</p>
                     </div>
                   </div>
 
-                  {/* Badges + actions */}
-                  <div className="flex items-center justify-between gap-3">
-                    {b.midi.pdf_url ? (
-                      <div className="px-2 py-1 bg-green-600/20 text-green-400 rounded text-xs font-medium">
-                        📄 PDF Available
-                      </div>
-                    ) : (
-                      <div className="px-2 py-1 bg-gray-600/20 text-gray-400 rounded text-xs font-medium">
-                        ❌ No PDF
-                      </div>
-                    )}
+                  <div className="space-y-4 p-5">
+                    <div>
+                      <Link
+                        href={`/midi/${bookmark.midi.id}`}
+                        className="line-clamp-1 text-xl font-black text-white transition hover:text-cyan-200"
+                      >
+                        {bookmark.midi.title}
+                      </Link>
+                      <p className="mt-1 line-clamp-1 text-sm text-slate-400">
+                        {bookmark.midi.composer || "Unknown Composer"}
+                      </p>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        removeBookmark(b.id);
-                      }}
-                      disabled={removingId === b.id}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl
-                        border border-red-500/25 text-red-300
-                        hover:bg-red-500/10 hover:text-red-200 transition
-                        disabled:opacity-50"
-                      title="Remove bookmark"
-                    >
-                      {removingId === b.id ? (
-                        <Loader className="animate-spin" size={16} />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                      {bookmark.midi.genre ? (
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+                          {bookmark.midi.genre}
+                        </span>
+                      ) : null}
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+                        <CalendarDays size={12} />
+                        {formatSavedAt(bookmark.created_at)}
+                      </span>
+                    </div>
+
+                    <RatingDisplay avg={rating.avg} count={rating.count} />
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <Link
+                        href={`/midi/${bookmark.midi.id}`}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/30 hover:text-white"
+                      >
+                        Open details
+                        <ArrowRight size={15} />
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => removeBookmark(bookmark.id)}
+                        disabled={removingId === bookmark.id}
+                        className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-red-400/20 bg-red-400/10 text-red-200 transition hover:bg-red-400/15 disabled:opacity-50"
+                        title="Remove bookmark"
+                        aria-label={`Remove ${bookmark.midi.title} from bookmarks`}
+                      >
+                        {removingId === bookmark.id ? (
+                          <Loader className="animate-spin" size={17} />
+                        ) : (
+                          <Trash2 size={17} />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </Link>
+                </article>
               );
             })}
-          </div>
+          </section>
         )}
       </div>
     </main>
   );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="mb-3 inline-flex rounded-xl border border-cyan-300/15 bg-cyan-300/10 p-2 text-cyan-100">
+        {icon}
+      </div>
+      <p className="text-2xl font-black text-white">{value}</p>
+      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.045] p-10 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+        <Bookmark size={28} />
+      </div>
+      <p className="mt-5 text-2xl font-black">No bookmarks yet</p>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
+        Save favorites from the MIDI library and they will appear here with ratings, PDFs, and quick actions.
+      </p>
+      <Link
+        href="/midi"
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-3 font-bold text-white shadow-lg transition hover:from-blue-400 hover:to-indigo-400"
+      >
+        Browse MIDI
+        <ArrowRight size={16} />
+      </Link>
+    </div>
+  );
+}
+
+function compactNumber(value: number) {
+  return new Intl.NumberFormat("en", { notation: "compact" }).format(value);
+}
+
+function formatSavedAt(iso?: string | null) {
+  if (!iso) return "Saved";
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
 }
