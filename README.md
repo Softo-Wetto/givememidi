@@ -1,4 +1,18 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+GiveMeMIDI is a Next.js app backed by PocketBase.
+
+## Environment
+
+Set these values locally and in production:
+
+```bash
+POCKETBASE_URL="https://your-pocketbase-domain"
+NEXT_PUBLIC_POCKETBASE_URL="https://your-pocketbase-domain"
+RESEND_API_KEY="your_resend_key"
+CONTACT_TO_EMAIL="you@example.com"
+RESEND_FROM_EMAIL="GiveMeMIDI <hello@your-verified-domain.com>"
+```
+
+`RESEND_API` is also supported as a fallback for the Resend key. Contact form messages are saved into PocketBase and emailed to `CONTACT_TO_EMAIL`.
 
 ## Getting Started
 

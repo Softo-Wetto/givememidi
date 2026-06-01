@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { pocketbase } from "../../lib/pocketbaseClient";
 import { Mail, MessageSquare, Send, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function ContactPage() {
@@ -32,29 +31,35 @@ export default function ContactPage() {
 
     if (message.trim().length < 10) {
       setStatus("error");
-      setStatusMsg("Message is too short — add a bit more detail (10+ chars).");
+      setStatusMsg("Message is too short. Add a bit more detail (10+ chars).");
       return;
     }
 
     setSending(true);
 
-    const { error } = await pocketbase.from("contact_messages").insert({
-      email: email.trim(),
-      subject: subject.trim() ? subject.trim() : null,
-      message: message.trim(),
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+      }),
     });
 
     setSending(false);
 
-    if (error) {
-      console.error(error);
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       setStatus("error");
-      setStatusMsg("Couldn’t send right now. Please try again in a moment.");
+      setStatusMsg(payload?.error ?? "Couldn't send right now. Please try again in a moment.");
       return;
     }
 
     setStatus("success");
-    setStatusMsg("Sent! Thanks — we’ll get back to you soon.");
+    setStatusMsg("Sent. Thanks, we'll get back to you soon.");
     setEmail("");
     setSubject("");
     setMessage("");
@@ -81,7 +86,7 @@ export default function ContactPage() {
           </h1>
 
           <p className="mt-2 text-gray-400 max-w-2xl">
-            Questions, requests, or copyright concerns? Send a message and we’ll
+            Questions, requests, or copyright concerns? Send a message and we&apos;ll
             respond as soon as possible.
           </p>
         </div>
@@ -116,7 +121,7 @@ export default function ContactPage() {
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. MIDI request, bug report, copyright claim…"
+                  placeholder="e.g. MIDI request, bug report, copyright claim..."
                   className="w-full p-3 rounded-xl bg-gray-900/60 border border-gray-700
                     focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/40
                     placeholder:text-gray-500"
@@ -130,7 +135,7 @@ export default function ContactPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={6}
-                  placeholder="Tell us what you need…"
+                  placeholder="Tell us what you need..."
                   className="w-full p-3 rounded-xl bg-gray-900/60 border border-gray-700
                     focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/40
                     placeholder:text-gray-500 resize-none"
@@ -167,7 +172,7 @@ export default function ContactPage() {
                 {sending ? (
                   <span className="inline-flex items-center justify-center gap-2">
                     <Loader2 className="animate-spin" size={18} />
-                    Sending…
+                    Sending...
                   </span>
                 ) : (
                   <span className="inline-flex items-center justify-center gap-2">
@@ -193,7 +198,7 @@ export default function ContactPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400" />
-                  Requests are welcome — add reference links if possible.
+                  Requests are welcome. Add reference links if possible.
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400" />
@@ -203,10 +208,9 @@ export default function ContactPage() {
             </div>
 
             <div className="bg-gradient-to-r from-blue-500/15 to-indigo-500/15 border border-white/10 rounded-3xl p-6 shadow-xl">
-              <h3 className="font-bold text-lg">Prefer email?</h3>
+              <h3 className="font-bold text-lg">Delivered by Resend</h3>
               <p className="text-sm text-gray-300 mt-2">
-                You can also contact us directly at{" "}
-                <span className="font-semibold text-white">support@givememidi.com</span>{" "}
+                New messages go to your configured inbox and are saved in PocketBase for follow-up.
               </p>
             </div>
           </aside>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Award,
+  Compass,
   Menu,
   X,
   Search,
@@ -13,7 +15,11 @@ import {
   Bookmark,
   LogOut,
   ChevronDown,
+  Info,
   Loader2,
+  Mail,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { User as UserIcon } from "lucide-react";
 import { UploadCloud } from "lucide-react";
@@ -328,16 +334,17 @@ export function Header() {
                     setDiscoverOpen((v) => !v);
                     setProfileOpen(false);
                   }}
-                  className={`group inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition
+                  className={`group inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition
                     ${
                       discoverOpen
-                        ? "text-white bg-white/10 border border-blue-400/30"
-                        : "text-gray-200 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-400/40"
+                        ? "border border-cyan-300/40 bg-cyan-300/10 text-white shadow-[0_0_24px_rgba(34,211,238,0.14)]"
+                        : "border border-white/10 bg-white/5 text-gray-200 hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white"
                     }`}
                   aria-haspopup="menu"
                   aria-expanded={discoverOpen}
                 >
-                  Discover
+                  <Compass size={16} className="text-cyan-300 transition group-hover:rotate-12" />
+                  <span>Discover</span>
                   <ChevronDown
                     size={16}
                     className={`transition-transform ${
@@ -351,56 +358,98 @@ export function Header() {
                 {discoverOpen && (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute right-0 mt-2 w-64 rounded-2xl bg-gray-900 border border-gray-700 shadow-2xl overflow-hidden
-                               animate-in fade-in zoom-in-95"
+                    className="absolute right-0 mt-3 w-[25rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl animate-in fade-in zoom-in-95"
                     role="menu"
                   >
-                    <div className="px-4 py-3 border-b border-gray-700">
-                      <p className="text-xs text-gray-400">Explore</p>
-                      <p className="text-sm font-semibold text-white">
-                        Discover content
-                      </p>
+                    <div className="relative overflow-hidden border-b border-white/10 px-5 py-4">
+                      <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl" />
+                      <div className="relative flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200/80">
+                            Library
+                          </p>
+                          <p className="mt-1 text-base font-bold text-white">Find your next MIDI</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            Browse scores, creators, community picks, and support links.
+                          </p>
+                        </div>
+                        <span className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-cyan-200">
+                          <Sparkles size={18} />
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="py-1">
+                    <div className="grid gap-2 p-2">
                       <Link
                         href="/midi"
                         onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/5 transition"
+                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
                         role="menuitem"
                       >
-                        <span className="opacity-90">🎵</span> All MIDI
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-400/10 text-blue-200 ring-1 ring-blue-300/15">
+                          <Music size={17} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-white">All MIDI</span>
+                          <span className="block truncate text-xs text-slate-400">
+                            Search the full library by title, composer, or genre.
+                          </span>
+                        </span>
                       </Link>
 
                       <Link
                         href="/creators"
                         onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/5 transition"
+                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
                         role="menuitem"
                       >
-                        <span className="opacity-90">🏆</span> Top Creators
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-300/10 text-amber-200 ring-1 ring-amber-200/15">
+                          <Award size={17} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-white">Top Creators</span>
+                          <span className="block truncate text-xs text-slate-400">
+                            See points, upload streaks, and community favorites.
+                          </span>
+                        </span>
+                      </Link>
+
+                      <Link
+                        href="/midi?sort=downloads"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
+                        role="menuitem"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200 ring-1 ring-emerald-200/15">
+                          <TrendingUp size={17} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-white">Most Downloaded</span>
+                          <span className="block truncate text-xs text-slate-400">
+                            Jump into MIDI files people are saving most.
+                          </span>
+                        </span>
                       </Link>
                     </div>
-
-                    <div className="h-px bg-gray-700" />
-
-                    <div className="py-1">
+                    <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-white/[0.02] p-2">
                       <Link
                         href="/about"
                         onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition"
+                        className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
                         role="menuitem"
                       >
-                        <span className="opacity-80">ℹ️</span> About
+                        <Info size={14} className="text-indigo-200" />
+                        About
                       </Link>
 
                       <Link
                         href="/contact"
                         onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition"
+                        className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
                         role="menuitem"
                       >
-                        <span className="opacity-80">✉️</span> Contact
+                        <Mail size={14} className="text-cyan-200" />
+                        Contact
                       </Link>
                     </div>
                   </div>
@@ -575,37 +624,41 @@ export function Header() {
               {searchDropdown}
             </form>
 
-            <nav className="flex flex-col gap-2 text-sm mt-4">
+            <nav className="mt-4 grid gap-2 text-sm">
               <Link
                 href="/midi"
                 onClick={closeAll}
-                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-cyan-300/30 hover:text-white"
               >
-                🎵 All MIDI
+                <Music size={16} className="text-blue-200" />
+                All MIDI
               </Link>
 
               <Link
                 href="/creators"
                 onClick={closeAll}
-                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-amber-200/30 hover:text-white"
               >
-                🏆 Top Creators
+                <Award size={16} className="text-amber-200" />
+                Top Creators
               </Link>
 
               <Link
                 href="/contact"
                 onClick={closeAll}
-                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-cyan-300/30 hover:text-white"
               >
-                ✉️ Contact
+                <Mail size={16} className="text-cyan-200" />
+                Contact
               </Link>
 
               <Link
                 href="/about"
                 onClick={closeAll}
-                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-200 hover:text-white transition"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-indigo-300/30 hover:text-white"
               >
-                ℹ️ About
+                <Info size={16} className="text-indigo-200" />
+                About
               </Link>
             </nav>
 
