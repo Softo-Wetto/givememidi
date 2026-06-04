@@ -202,15 +202,15 @@ export default function ContactPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400" />
-                  We store messages in our database so we can respond.
+                  We keep support messages so we can follow up properly.
                 </li>
               </ul>
             </div>
 
             <div className="bg-gradient-to-r from-blue-500/15 to-indigo-500/15 border border-white/10 rounded-3xl p-6 shadow-xl">
-              <h3 className="font-bold text-lg">Delivered by Resend</h3>
+              <h3 className="font-bold text-lg">Sent to support</h3>
               <p className="text-sm text-gray-300 mt-2">
-                New messages go to your configured inbox and are saved in PocketBase for follow-up.
+                New messages go straight to the support inbox and are kept for follow-up.
               </p>
             </div>
           </aside>

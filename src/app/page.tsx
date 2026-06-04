@@ -1,6 +1,19 @@
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import Link from "next/link";
-import { ArrowRight, Music2, Search, Sparkles, UploadCloud } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  ArrowRight,
+  Award,
+  Bookmark,
+  FileText,
+  Flame,
+  Music2,
+  Search,
+  Sparkles,
+  Star,
+  UploadCloud,
+  Users,
+} from "lucide-react";
 import { MidiCard } from "./components/MidiCard";
 import { MidiRowScroller } from "./components/MidiRowScroller";
 
@@ -135,6 +148,7 @@ export default async function Home() {
   const hasLatest = (latestMidis?.length ?? 0) > 0;
   const hasPdf = (pdfMidis?.length ?? 0) > 0;
   const hasTopRated = topRatedOrdered.length > 0;
+  const totalDownloads = shownRows.reduce((sum, midi) => sum + (midi.downloads ?? 0), 0);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
@@ -181,6 +195,19 @@ export default async function Home() {
             </div>
 
             {topGenres.length > 0 ? <FeaturedGenres genres={topGenres} /> : null}
+
+            <div className="mt-7 grid max-w-2xl gap-3 sm:grid-cols-2">
+              <MiniFeature
+                icon={<Award size={17} />}
+                title="Creator awards"
+                text="Uploads, ratings, and downloads help creators build visible progress."
+              />
+              <MiniFeature
+                icon={<Bookmark size={17} />}
+                title="Personal library"
+                text="Bookmark useful MIDI files and return to them without digging."
+              />
+            </div>
           </div>
 
           <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5 shadow-2xl shadow-blue-950/20 backdrop-blur">
@@ -192,7 +219,7 @@ export default async function Home() {
                   Live discovery
                 </div>
                 <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
-                  PocketBase powered
+                  Community powered
                 </span>
               </div>
 
@@ -232,7 +259,58 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-7xl px-6 pt-10">
+        <div className="grid gap-4 lg:grid-cols-4">
+          <DiscoveryTile
+            icon={<Flame size={20} />}
+            label="Popular"
+            value={hasPopular ? `${popularMidis!.length} picks` : "Starting soon"}
+            href="/midi?sort=downloads"
+          />
+          <DiscoveryTile
+            icon={<Star size={20} />}
+            label="Top rated"
+            value={hasTopRated ? `${topRatedOrdered.length} favorites` : "Needs ratings"}
+            href="/midi"
+          />
+          <DiscoveryTile
+            icon={<FileText size={20} />}
+            label="Sheet music"
+            value={hasPdf ? `${pdfMidis!.length} PDFs` : "Upload PDFs"}
+            href="/midi"
+          />
+          <DiscoveryTile
+            icon={<Users size={20} />}
+            label="Creators"
+            value={totalDownloads > 0 ? `${totalDownloads} downloads` : "Join in"}
+            href="/creators"
+          />
+        </div>
+      </section>
+
       <section className="mx-auto max-w-7xl space-y-14 px-6 pb-24 pt-12">
+        <div className="hover-shine rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.045] to-cyan-300/10 p-6 shadow-xl shadow-black/20 md:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/80">
+                Creator rewards
+              </p>
+              <h2 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">
+                Uploads should feel worth it.
+              </h2>
+              <p className="mt-3 max-w-2xl leading-7 text-slate-300">
+                GiveMeMIDI highlights creator momentum through ratings, bookmarks, downloads, and upload progress, so contributors get more than a quiet file listing.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <RewardMetric label="Rate" value="Stars" />
+              <RewardMetric label="Collect" value="Bookmarks" />
+              <RewardMetric label="Share" value="Uploads" />
+            </div>
+          </div>
+        </div>
+
         <MidiSection
           title="Popular MIDI files"
           subtitle="The most downloaded files right now."
@@ -381,6 +459,55 @@ function FeaturedGenres({ genres }: { genres: { genre: string; count: number }[]
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+function MiniFeature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+      <div className="flex items-center gap-2 text-sm font-bold text-white">
+        <span className="text-cyan-300">{icon}</span>
+        {title}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-400">{text}</p>
+    </div>
+  );
+}
+
+function DiscoveryTile({
+  icon,
+  label,
+  value,
+  href,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="hover-shine card-lift rounded-3xl border border-white/10 bg-white/[0.045] p-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-400/10 text-cyan-200 ring-1 ring-blue-300/20">
+          {icon}
+        </span>
+        <ArrowRight size={17} className="text-slate-500" />
+      </div>
+      <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-white">{value}</p>
+    </Link>
+  );
+}
+
+function RewardMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 font-black text-white">{value}</p>
     </div>
   );
 }

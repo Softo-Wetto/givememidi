@@ -568,10 +568,10 @@ export const pocketbase = {
       }
     },
     async resetPasswordForEmail(..._args: unknown[]) {
-      return { data: null, error: new Error("Password reset email is not configured for PocketBase yet.") };
+      return { data: null, error: new Error("Password reset email is not configured yet.") };
     },
     async signInWithOAuth(..._args: unknown[]) {
-      return { data: null, error: new Error("OAuth is not configured for PocketBase yet.") };
+      return { data: null, error: new Error("OAuth is not configured yet.") };
     },
   },
   from(collection: string) {

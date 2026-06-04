@@ -94,15 +94,15 @@ export default function PrivacyPage() {
 
           <Card title="3) Where data is stored & processed" icon="🗄️">
             <p className="text-gray-300 text-sm leading-relaxed">
-              GiveMeMIDI uses PocketBase for authentication, database, and file
-              storage. Files you upload are stored in buckets and access may be
-              controlled by signed URLs and/or row-level security (RLS).
+              GiveMeMIDI uses secure account, database, and file storage systems
+              to provide login, uploads, downloads, comments, and bookmarks. File
+              access may be protected with temporary download links.
             </p>
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <Pill label="Auth" value="PocketBase Auth" />
-              <Pill label="Database" value="Postgres" />
-              <Pill label="Storage" value="Buckets (MIDI/PDF)" />
+              <Pill label="Account" value="Login sessions" />
+              <Pill label="Library" value="MIDI records" />
+              <Pill label="Files" value="MIDI/PDF storage" />
             </div>
           </Card>
 

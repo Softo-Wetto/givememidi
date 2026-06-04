@@ -17,8 +17,8 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // When the user lands here from the email link, pocketbase establishes a recovery session.
-    // We can just mark ready after a session check.
+    // When the user lands here from the email link, the app receives a recovery session.
+    // We can mark ready after a session check.
     (async () => {
       const { data } = await pocketbase.auth.getSession();
       // If session is null, they likely opened this page without the email link

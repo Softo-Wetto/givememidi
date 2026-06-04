@@ -61,7 +61,7 @@ async function getPocketBaseAdminToken(baseUrl: string) {
 async function saveContactMessage(payload: ContactMessage) {
   const baseUrl = getPocketBaseUrl().replace(/\/$/, "");
   if (!baseUrl) {
-    return { ok: false, reason: "PB_URL_MISSING" };
+    return { ok: false, reason: "MESSAGE_STORE_URL_MISSING" };
   }
 
   const recordUrl = `${baseUrl}/api/collections/contact_messages/records`;
@@ -80,11 +80,11 @@ async function saveContactMessage(payload: ContactMessage) {
   if (publicResponse.ok) return { ok: true, reason: null };
 
   if (![401, 403].includes(publicResponse.status)) {
-    return { ok: false, reason: `PB_SAVE_${publicResponse.status}` };
+    return { ok: false, reason: `MESSAGE_STORE_SAVE_${publicResponse.status}` };
   }
 
   const token = await getPocketBaseAdminToken(baseUrl);
-  if (!token) return { ok: false, reason: `PB_AUTH_${publicResponse.status}` };
+  if (!token) return { ok: false, reason: `MESSAGE_STORE_AUTH_${publicResponse.status}` };
 
   const adminResponse = await fetch(recordUrl, {
     method: "POST",
@@ -97,7 +97,7 @@ async function saveContactMessage(payload: ContactMessage) {
 
   return {
     ok: adminResponse.ok,
-    reason: adminResponse.ok ? null : `PB_ADMIN_SAVE_${adminResponse.status}`,
+    reason: adminResponse.ok ? null : `MESSAGE_STORE_ADMIN_SAVE_${adminResponse.status}`,
   };
 }
 
@@ -106,10 +106,10 @@ async function sendContactEmail(payload: ContactMessage) {
   const toEmail =
     process.env.CONTACT_TO_EMAIL ?? process.env.SUPPORT_EMAIL ?? "nightmareasian@gmail.com";
   const fromEmail =
-    process.env.RESEND_FROM_EMAIL ?? "GiveMeMIDI <onboarding@resend.dev>";
+    process.env.RESEND_FROM_EMAIL ?? process.env.CONTACT_FROM_EMAIL ?? "GiveMeMIDI <no-reply@givememidi.com>";
 
   if (!resendKey) {
-    return { ok: false, reason: "RESEND_KEY_MISSING" };
+    return { ok: false, reason: "EMAIL_KEY_MISSING" };
   }
 
   const safeSubject = payload.subject || "New GiveMeMIDI contact message";
@@ -143,8 +143,8 @@ async function sendContactEmail(payload: ContactMessage) {
   if (response.ok) return { ok: true, reason: null };
 
   const text = await response.text().catch(() => "");
-  console.error("Resend contact send failed:", response.status, text);
-  return { ok: false, reason: `RESEND_${response.status}` };
+  console.error("Contact email send failed:", response.status, text);
+  return { ok: false, reason: `EMAIL_DELIVERY_${response.status}` };
 }
 
 export async function POST(request: Request) {
@@ -176,12 +176,12 @@ export async function POST(request: Request) {
   ]);
 
   if (!saveResult.ok) {
-    console.error("PocketBase contact save failed:", saveResult.reason);
+    console.error("Contact message save failed:", saveResult.reason);
   }
 
   if (!emailResult.ok) {
     const message =
-      emailResult.reason === "RESEND_KEY_MISSING"
+      emailResult.reason === "EMAIL_KEY_MISSING"
         ? "Email delivery is not configured on the server."
         : "Could not send your message right now.";
 

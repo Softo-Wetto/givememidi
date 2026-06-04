@@ -58,7 +58,7 @@ export async function pbRequest<T>(
   });
 
   if (!response.ok) {
-    let message = `PocketBase request failed (${response.status})`;
+    let message = `Service request failed (${response.status})`;
 
     try {
       const body = await response.json();

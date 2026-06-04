@@ -242,7 +242,7 @@ export default function ProfilePage() {
       const profile = await updateRecord<ProfileRow>("profiles", user.id, form);
       const publicUrl = getPocketBaseFileUrl("profiles", profile.id, profile.avatar);
 
-      if (!publicUrl) throw new Error("PocketBase did not return an avatar file.");
+      if (!publicUrl) throw new Error("The avatar file could not be prepared.");
 
       await updateRecord<ProfileRow>("profiles", user.id, { avatar_url: publicUrl });
 

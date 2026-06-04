@@ -32,7 +32,7 @@ export default function AllMidiClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Create pocketbase client ONLY on client side
+  // Create the data client only on the browser side.
   const pocketbase = useMemo(() => {
     return createPocketBaseClient();
   }, []);

@@ -129,7 +129,7 @@ export function Footer() {
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
           <p className="text-xs text-gray-500">© {new Date().getFullYear()} GiveMeMIDI. All rights reserved.</p>
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="hidden sm:inline">Built with PocketBase + Next.js</span>
+            <span className="hidden sm:inline">Built for MIDI creators</span>
             <span className="hidden sm:inline">•</span>
             <Link href="/contact" className="transition hover:text-gray-300">
               Support
