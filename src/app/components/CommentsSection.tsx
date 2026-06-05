@@ -45,6 +45,7 @@ const prompts = ["Love the arrangement", "Is there a slower version?", "Great fo
 
 function timeAgo(iso: string) {
   const date = new Date(iso).getTime();
+  if (!Number.isFinite(date)) return "Just now";
   const diff = Date.now() - date;
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return `${seconds}s ago`;
@@ -57,13 +58,15 @@ function timeAgo(iso: string) {
 }
 
 function fullDate(iso: string) {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "Just now";
   return new Intl.DateTimeFormat("en-AU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 function initials(name: string) {
@@ -198,8 +201,8 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     });
 
     return rows.sort((a, b) => {
-      const left = new Date(a.created_at).getTime();
-      const right = new Date(b.created_at).getTime();
+      const left = new Date(a.created_at).getTime() || 0;
+      const right = new Date(b.created_at).getTime() || 0;
       return sort === "newest" ? right - left : left - right;
     });
   }, [comments, mineOnly, query, sort, userId]);
@@ -228,9 +231,11 @@ export function CommentsSection({ midiId }: { midiId: string }) {
 
     try {
       const { data, error } = await pocketbase.from("midi_comments").insert({
+        legacy_id: crypto.randomUUID(),
         midi_id: midiId,
         user_id: userId,
         body: trimmed,
+        created_at: new Date().toISOString(),
       });
 
       if (error) {

@@ -29,6 +29,14 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function jsonSoftFailure(message: string) {
+  return NextResponse.json({
+    ok: false,
+    awarded: false,
+    error: message,
+  });
+}
+
 async function eventExists(eventKey: string) {
   const params = new URLSearchParams({
     page: "1",
@@ -196,6 +204,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("XP award error:", error);
-    return jsonError("Could not award XP right now.", 500);
+    return jsonSoftFailure("XP could not be awarded right now.");
   }
 }

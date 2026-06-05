@@ -24,15 +24,45 @@ type Filter = {
   value: unknown;
 };
 
+const LEGACY_ID_COLLECTIONS = new Set([
+  "profiles",
+  "music_files",
+  "midi_ratings",
+  "midi_comments",
+  "follows",
+  "bookmarks",
+  "contact_messages",
+]);
+
+const UPDATED_AT_COLLECTIONS = new Set([
+  "users",
+  "profiles",
+  "music_files",
+  "midi_ratings",
+]);
+
+function withCreateDefaults(collection: string, data: Record<string, unknown>) {
+  const now = new Date().toISOString();
+  return {
+    ...data,
+    ...(LEGACY_ID_COLLECTIONS.has(collection) && !data.legacy_id
+      ? { legacy_id: crypto.randomUUID() }
+      : {}),
+    created_at: data.created_at ?? now,
+    ...(UPDATED_AT_COLLECTIONS.has(collection) ? { updated_at: data.updated_at ?? now } : {}),
+  };
+}
+
 async function createPbRecord<T extends RawPocketBaseRecord>(
   collection: string,
   data: Record<string, unknown> | FormData
 ) {
   const auth = getBrowserAuth();
+  const body = data instanceof FormData ? data : withCreateDefaults(collection, data);
   const record = await pbRequest<T>(`/api/collections/${collection}/records`, {
     method: "POST",
     token: auth?.token,
-    body: data instanceof FormData ? data : JSON.stringify(data),
+    body: data instanceof FormData ? data : JSON.stringify(body),
   });
 
   return normalizeRecord(record);
