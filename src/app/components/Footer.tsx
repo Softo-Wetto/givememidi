@@ -80,6 +80,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <FooterLink href="/midi" label="All MIDI" />
               <FooterLink href="/creators" label="Top creators" />
+              <FooterLink href="/awards" label="Awards & ranks" />
               <FooterLink href="/bookmarks" label="Bookmarks" />
               <FooterLink href="/upload" label="Upload" />
               <FooterLink href="/myuploads" label="My uploads" />

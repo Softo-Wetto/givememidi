@@ -1,231 +1,203 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  FileMusic,
+  Gavel,
+  MessageSquare,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+  UserCheck,
+  Zap,
+} from "lucide-react";
+
+const rules = [
+  {
+    icon: UploadCloud,
+    title: "Upload responsibly",
+    text: "Only upload MIDI or PDF files you own or have permission to share.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Be respectful",
+    text: "No harassment, hate, threats, spam, scams, or malicious links.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Protect the service",
+    text: "Do not exploit bugs, bypass access controls, or overload the site.",
+  },
+];
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
-      {/* subtle glow */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-44 left-1/2 -translate-x-1/2 h-72 w-[900px] rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 right-1/4 h-72 w-[720px] rounded-full bg-blue-500/10 blur-3xl" />
-      </div>
-
-      <div className="relative max-w-5xl mx-auto px-6 py-12">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-            <span className="text-indigo-300">📜</span>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
+        <div className="relative mx-auto max-w-6xl px-6 py-16">
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-4 py-2 text-sm font-semibold text-indigo-100">
+            <Gavel size={16} />
             Terms of Service
           </div>
-
-          <h1 className="mt-4 text-4xl md:text-5xl font-extrabold leading-tight">
-            Rules that keep{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-              GiveMeMIDI
-            </span>{" "}
-            healthy
+          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-tight md:text-6xl">
+            Clear rules for a healthier MIDI library.
           </h1>
-
-          <p className="mt-3 text-gray-400 max-w-3xl">
-            By using GiveMeMIDI, you agree to these Terms. They exist to protect
-            creators, users, and the service.
+          <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
+            These Terms explain how to use GiveMeMIDI responsibly, what you can upload, and how we handle community behavior and rights concerns.
           </p>
-
-          <div className="mt-4 text-xs text-gray-500">
-            Last updated: <span className="text-gray-300">January 11, 2026</span>
-          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Last updated: <span className="text-slate-300">June 5, 2026</span>
+          </p>
         </div>
+      </section>
 
-        {/* Key rules */}
-        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <RuleCard title="Upload responsibly" icon="⬆️">
-            Only upload MIDI/PDF you own or have permission to share.
-          </RuleCard>
-          <RuleCard title="Be respectful" icon="💬">
-            No harassment, hate, or spam in comments.
-          </RuleCard>
-          <RuleCard title="No abuse" icon="🛡️">
-            Don’t exploit bugs, scrape aggressively, or break the service.
-          </RuleCard>
+      <section className="mx-auto max-w-6xl px-6 py-12">
+        <div className="mb-8 grid gap-4 md:grid-cols-3">
+          {rules.map(({ icon: Icon, title, text }) => (
+            <div key={title} className="hover-shine card-lift rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-400/10 text-blue-200 ring-1 ring-blue-300/20">
+                <Icon size={20} />
+              </span>
+              <h2 className="mt-4 font-black text-white">{title}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{text}</p>
+            </div>
+          ))}
         </div>
 
         <div className="space-y-6">
-          <Card title="1) Accounts" icon="👤">
-            <ul className="space-y-3 text-gray-300 text-sm leading-relaxed">
-              <li>
-                You’re responsible for keeping your account secure (passwords,
-                access to your email, etc.).
-              </li>
-              <li>
-                You must not impersonate others or choose misleading usernames.
-              </li>
-              <li>
-                We may suspend accounts engaged in abuse, spam, or violations.
-              </li>
+          <TermsCard icon={<UserCheck />} title="1. Accounts">
+            <ul className="space-y-3 text-sm leading-7 text-slate-300">
+              <li>You are responsible for keeping your login details secure.</li>
+              <li>Do not impersonate others or use misleading usernames.</li>
+              <li>Accounts involved in abuse, spam, or repeated violations may be limited or suspended.</li>
             </ul>
-          </Card>
+          </TermsCard>
 
-          <Card title="2) Uploads & copyright" icon="©️">
-            <div className="space-y-3 text-gray-300 text-sm leading-relaxed">
+          <TermsCard icon={<FileMusic />} title="2. Uploads and copyright">
+            <div className="space-y-3 text-sm leading-7 text-slate-300">
               <p>
-                GiveMeMIDI is built for sharing and discovering MIDI and optional
-                PDF sheet music. Upload only content you have the rights to share.
+                GiveMeMIDI is for sharing MIDI files and optional PDF sheet music. Upload only material you own or have the right to share.
               </p>
               <p>
-                If you upload content that infringes someone’s rights, we may remove
-                it and take action on your account.
+                If content infringes someone&apos;s rights, we may remove it and take action on the account that uploaded it.
               </p>
               <p>
-                To report a copyright issue, use{" "}
-                <Link href="/contact" className="text-blue-300 hover:text-blue-200 font-semibold">
+                To report a rights issue, use{" "}
+                <Link href="/contact" className="font-bold text-cyan-200 hover:text-white">
                   Contact
                 </Link>{" "}
-                with details (link, proof of ownership, and the requested action).
+                with the MIDI link, proof of ownership, and the action you are requesting.
               </p>
             </div>
-
-            <div className="mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-500/10 p-4 text-sm text-yellow-100">
-              Tip: If you’re uploading a cover/transcription, make sure you’re allowed
-              to share it publicly. “Found it online” isn’t permission.
+            <div className="mt-5 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-4 text-sm leading-6 text-yellow-100">
+              If you found a file online, that does not automatically mean you can upload it here.
             </div>
-          </Card>
+          </TermsCard>
 
-          <Card title="3) Comments & community" icon="🗣️">
-            <ul className="space-y-3 text-gray-300 text-sm leading-relaxed">
-              <li>No harassment, hate speech, or threats.</li>
-              <li>No spam, scams, or malicious links.</li>
-              <li>No doxxing or sharing personal data.</li>
-              <li>We may remove content that violates these rules.</li>
-            </ul>
-          </Card>
-
-          <Card title="4) Service availability" icon="⚡">
-            <div className="space-y-3 text-gray-300 text-sm leading-relaxed">
-              <p>
-                We aim for high availability, but the service may occasionally be
-                down for maintenance or unexpected issues.
-              </p>
-              <p>
-                We may update features, change layouts, or adjust limits to improve
-                stability and prevent abuse.
-              </p>
+          <TermsCard icon={<MessageSquare />} title="3. Community behavior">
+            <div className="grid gap-4 md:grid-cols-2">
+              <MiniRule title="Allowed">
+                Helpful comments, respectful requests, ratings, bookmarks, follows, and constructive feedback.
+              </MiniRule>
+              <MiniRule title="Not allowed">
+                Harassment, hate speech, threats, spam, doxxing, malicious links, scams, or deceptive download prompts.
+              </MiniRule>
             </div>
-          </Card>
+          </TermsCard>
 
-          <Card title="5) Prohibited behavior" icon="⛔">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-              <MiniCard title="Security abuse">
-                Attempting to bypass authentication, steal data, or exploit vulnerabilities.
-              </MiniCard>
-              <MiniCard title="Aggressive scraping">
-                Automated extraction that harms performance or violates access controls.
-              </MiniCard>
-              <MiniCard title="Malicious uploads">
-                Uploading files intended to harm devices or users (malware, deceptive content).
-              </MiniCard>
-              <MiniCard title="Fraud & scams">
-                Phishing, impersonation, or misleading “download” links.
-              </MiniCard>
+          <TermsCard icon={<Zap />} title="4. Service availability">
+            <p className="text-sm leading-7 text-slate-300">
+              We work to keep GiveMeMIDI reliable, but the site may occasionally be unavailable for maintenance, updates, or unexpected issues. Features, layouts, and limits may change to improve stability, safety, or user experience.
+            </p>
+          </TermsCard>
+
+          <TermsCard icon={<AlertTriangle />} title="5. Prohibited behavior">
+            <div className="grid gap-4 md:grid-cols-2">
+              <MiniRule title="Security abuse">
+                Attempting to bypass login, steal data, exploit vulnerabilities, or disrupt service.
+              </MiniRule>
+              <MiniRule title="Aggressive scraping">
+                Automated extraction that harms performance or ignores access limits.
+              </MiniRule>
+              <MiniRule title="Malicious uploads">
+                Files designed to harm devices, mislead users, or distribute malware.
+              </MiniRule>
+              <MiniRule title="Fraud and scams">
+                Phishing, impersonation, or fake download links.
+              </MiniRule>
             </div>
-          </Card>
+          </TermsCard>
 
-          <Card title="6) Limitation of liability" icon="⚖️">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              GiveMeMIDI is provided “as is”. To the extent permitted by law, we
-              aren’t liable for indirect damages, loss of data, or issues caused by
-              user-uploaded content. You are responsible for ensuring you have
-              permission to use downloaded content.
+          <TermsCard icon={<Gavel />} title="6. Liability and responsibility">
+            <p className="text-sm leading-7 text-slate-300">
+              GiveMeMIDI is provided as is. To the extent permitted by law, we are not liable for indirect damages, data loss, or issues caused by user-uploaded content. You are responsible for ensuring you have permission to use downloaded files.
             </p>
-          </Card>
+          </TermsCard>
 
-          <Card title="7) Privacy" icon="🔒">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Our{" "}
-              <Link href="/privacy" className="text-blue-300 hover:text-blue-200 font-semibold">
-                Privacy Policy
-              </Link>{" "}
-              explains what data we collect and why.
-            </p>
-          </Card>
-
-          <Card title="8) Contact" icon="📬">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Questions about these Terms? Reach out via{" "}
-              <Link href="/contact" className="text-blue-300 hover:text-blue-200 font-semibold">
-                Contact
-              </Link>
-              .
-            </p>
-          </Card>
-
-          {/* Footer CTA */}
-          <div className="pt-4 flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/privacy"
-              className="flex-1 inline-flex items-center justify-center px-4 py-3 rounded-2xl
-                         bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-400/30
-                         text-sm font-semibold transition"
-            >
-              Read Privacy Policy →
-            </Link>
-            <Link
-              href="/contact"
-              className="flex-1 inline-flex items-center justify-center px-4 py-3 rounded-2xl
-                         bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400
-                         text-sm font-semibold shadow-lg transition"
-            >
-              Contact support →
-            </Link>
+          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/15 via-white/[0.045] to-cyan-300/10 p-6 md:p-8">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-cyan-200/80">
+                  <Sparkles size={14} />
+                  Related policies
+                </p>
+                <h2 className="mt-2 text-2xl font-black">Need help or clarification?</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  Read the privacy policy or contact support with questions about these Terms.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href="/privacy"
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-bold text-slate-100 transition hover:border-cyan-300/40"
+                >
+                  Privacy
+                </Link>
+                <Link
+                  href="/contact"
+                  className="btn-glow inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-5 py-3 text-sm font-bold text-white"
+                >
+                  Contact
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
 
-function Card({
-  title,
+function TermsCard({
   icon,
+  title,
   children,
 }: {
+  icon: ReactNode;
   title: string;
-  icon: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-xl">
-      <div className="flex items-start gap-3 mb-4">
-        <div className="h-10 w-10 rounded-2xl border border-white/10 bg-black/20 flex items-center justify-center">
-          <span className="text-lg">{icon}</span>
-        </div>
-        <div>
-          <h2 className="text-xl md:text-2xl font-extrabold">{title}</h2>
-          <div className="mt-1 h-px w-24 bg-gradient-to-r from-blue-500/60 to-indigo-500/60" />
-        </div>
+    <section className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-6 shadow-xl shadow-black/20 md:p-8">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-300/10 text-indigo-200 ring-1 ring-indigo-300/20">
+          {icon}
+        </span>
+        <h2 className="text-xl font-black md:text-2xl">{title}</h2>
       </div>
       {children}
     </section>
   );
 }
 
-function MiniCard({ title, children }: { title: string; children: React.ReactNode }) {
+function MiniRule({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <p className="text-white font-semibold">{title}</p>
-      <div className="mt-2 text-gray-300 leading-relaxed">{children}</div>
-    </div>
-  );
-}
-
-function RuleCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-2xl border border-white/10 bg-black/20 flex items-center justify-center">
-          <span className="text-lg">{icon}</span>
-        </div>
-        <p className="text-white font-extrabold">{title}</p>
-      </div>
-      <p className="mt-3 text-sm text-gray-400 leading-relaxed">{children}</p>
+    <div className="card-lift rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="font-bold text-white">{title}</p>
+      <div className="mt-2 text-sm leading-6 text-slate-400">{children}</div>
     </div>
   );
 }

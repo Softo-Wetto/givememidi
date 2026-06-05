@@ -27,6 +27,9 @@ export type UserProfile = PocketBaseRecord & {
   username: string | null;
   bio?: string | null;
   avatar_url?: string | null;
+  cosmetic_theme?: string | null;
+  banner_style?: string | null;
+  featured_badge?: string | null;
 };
 
 export type MusicFile = PocketBaseRecord & {
@@ -41,6 +44,28 @@ export type MusicFile = PocketBaseRecord & {
   pdf_file?: string | null;
   downloads: number;
   uploaded_by: string | null;
+};
+
+export type XpEvent = RawPocketBaseRecord & {
+  user_id: string;
+  event_key: string;
+  action: string;
+  label: string;
+  xp: number;
+  credits: number;
+  target_collection?: string | null;
+  target_id?: string | null;
+  metadata?: string | null;
+};
+
+export type UserReward = RawPocketBaseRecord & {
+  user_id: string;
+  item_key: string;
+  item_type: string;
+  label: string;
+  description?: string | null;
+  metadata?: string | null;
+  purchase_event?: string | null;
 };
 
 export type PocketBaseAuth = {

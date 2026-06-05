@@ -22,6 +22,9 @@ import {
   Trophy,
   TrendingUp,
   Music2,
+  Coins,
+  BadgeCheck,
+  Palette,
 } from "lucide-react";
 import {
   calculateCreatorPoints,
@@ -47,9 +50,22 @@ type ProfileRow = {
   bio: string | null;
   avatar_url: string | null;
   avatar?: string | null;
+  cosmetic_theme?: string | null;
+  banner_style?: string | null;
+  featured_badge?: string | null;
 };
 type UploadStatRow = { id: string; downloads: number | null };
 type RatingRow = { midi_id: string; rating: number | null };
+type RewardRow = {
+  id: string;
+  item_key: string;
+  item_type: string;
+  label: string;
+};
+type RewardsPayload = {
+  balance: { xp: number; credits: number };
+  rewards: RewardRow[];
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -62,12 +78,16 @@ export default function ProfilePage() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [cosmeticTheme, setCosmeticTheme] = useState<string | null>(null);
+  const [bannerStyle, setBannerStyle] = useState<string | null>(null);
+  const [featuredBadge, setFeaturedBadge] = useState<string | null>(null);
 
   const [email, setEmail] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
 
   const [provider, setProvider] = useState<string>("unknown");
+  const [wallet, setWallet] = useState<RewardsPayload | null>(null);
 
   // Stats
   const [totalUploads, setTotalUploads] = useState(0);
@@ -140,7 +160,7 @@ export default function ProfilePage() {
       // Profile
       const { data: prof, error: profErr } = await pocketbase
         .from("profiles")
-        .select<ProfileRow>("username, bio, avatar_url")
+        .select<ProfileRow>("username, bio, avatar_url, cosmetic_theme, banner_style, featured_badge")
         .eq("id", user.id)
         .maybeSingle<ProfileRow>();
 
@@ -149,6 +169,14 @@ export default function ProfilePage() {
       setUsername(prof?.username ?? "");
       setBio(prof?.bio ?? "");
       setAvatarUrl(prof?.avatar_url ?? null);
+      setCosmeticTheme(prof?.cosmetic_theme ?? null);
+      setBannerStyle(prof?.banner_style ?? null);
+      setFeaturedBadge(prof?.featured_badge ?? null);
+
+      const walletResponse = await fetch("/api/rewards", { cache: "no-store" });
+      if (walletResponse.ok) {
+        setWallet((await walletResponse.json()) as RewardsPayload);
+      }
 
       // Upload stats
       const { data: uploads, error: upErr } = await pocketbase
@@ -437,6 +465,69 @@ export default function ProfilePage() {
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide">Total ratings</p>
                 <p className="text-lg font-semibold">{totalRatings}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-300/10 via-black/20 to-blue-500/10 p-5">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-200 ring-1 ring-cyan-300/20">
+                  <Coins size={20} />
+                </span>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200/80">
+                    Creator wallet
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    Earn by uploading, rating, commenting, bookmarking, and following creators.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/awards"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+              >
+                Spend credits
+              </a>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">XP</p>
+                <p className="mt-1 text-2xl font-black text-white">{wallet?.balance.xp.toLocaleString() ?? "0"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Credits</p>
+                <p className="mt-1 text-2xl font-black text-white">{wallet?.balance.credits.toLocaleString() ?? "0"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Inventory</p>
+                <p className="mt-1 text-2xl font-black text-white">{wallet?.rewards.length ?? 0}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <Palette size={14} className="text-cyan-300" />
+                  Theme
+                </p>
+                <p className="mt-2 font-semibold capitalize text-white">{cosmeticTheme?.replaceAll("_", " ") ?? "Default"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <Palette size={14} className="text-blue-300" />
+                  Banner
+                </p>
+                <p className="mt-2 font-semibold capitalize text-white">{bannerStyle?.replaceAll("_", " ") ?? "None"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <BadgeCheck size={14} className="text-yellow-300" />
+                  Featured badge
+                </p>
+                <p className="mt-2 font-semibold text-white">{featuredBadge ?? "None"}</p>
               </div>
             </div>
           </div>

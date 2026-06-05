@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { pocketbase } from "../../lib/pocketbaseClient";
+import { awardXp } from "@/lib/xp-client";
 
 type BookmarkRow = { id: string };
 
@@ -92,7 +93,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
 
         setBookmarked(false);
       } else {
-        const { error } = await pocketbase.from("bookmarks").insert({
+        const { data, error } = await pocketbase.from("bookmarks").insert({
           user_id: userId,
           midi_id: midiId,
         });
@@ -103,6 +104,7 @@ export function BookmarkButton({ midiId }: { midiId: string }) {
         }
 
         setBookmarked(true);
+        await awardXp("bookmark", (data as { id?: string } | null)?.id);
       }
     } finally {
       setLoading(false);

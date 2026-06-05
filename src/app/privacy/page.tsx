@@ -1,267 +1,189 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import {
+  ArrowRight,
+  Cookie,
+  Database,
+  FileMusic,
+  LockKeyhole,
+  MessageSquare,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserCircle2,
+} from "lucide-react";
+
+const quickLinks = [
+  ["What we collect", "#collect"],
+  ["How we use it", "#use"],
+  ["Your controls", "#controls"],
+] as const;
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
-      {/* subtle glow */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-72 w-[900px] rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 left-1/4 h-72 w-[720px] rounded-full bg-indigo-500/10 blur-3xl" />
-      </div>
-
-      <div className="relative max-w-5xl mx-auto px-6 py-12">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-            <span className="text-blue-300">🔒</span>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
+        <div className="relative mx-auto max-w-6xl px-6 py-16">
+          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+            <LockKeyhole size={16} />
             Privacy Policy
           </div>
-
-          <h1 className="mt-4 text-4xl md:text-5xl font-extrabold leading-tight">
-            Your privacy,{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-              made simple
-            </span>
+          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-tight md:text-6xl">
+            Privacy, written for actual humans.
           </h1>
-
-          <p className="mt-3 text-gray-400 max-w-3xl">
-            This Privacy Policy explains what we collect, how we use it, and the
-            choices you have when using GiveMeMIDI.
+          <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
+            This policy explains what GiveMeMIDI collects, why it is collected, and how you can manage your account, uploads, comments, and support requests.
           </p>
+          <p className="mt-4 text-xs text-slate-500">
+            Last updated: <span className="text-slate-300">June 5, 2026</span>
+          </p>
+        </div>
+      </section>
 
-          <div className="mt-4 text-xs text-gray-500">
-            Last updated: <span className="text-gray-300">January 11, 2026</span>
-          </div>
+      <section className="mx-auto max-w-6xl px-6 py-12">
+        <div className="mb-8 grid gap-3 sm:grid-cols-3">
+          {quickLinks.map(([label, href]) => (
+            <a
+              key={href}
+              href={href}
+              className="hover-shine rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/35"
+            >
+              {label}
+            </a>
+          ))}
         </div>
 
-        {/* Quick nav */}
-        <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <QuickLink href="#what-we-collect" label="What we collect" />
-          <QuickLink href="#how-we-use" label="How we use it" />
-          <QuickLink href="#your-choices" label="Your choices" />
-        </div>
-
-        {/* Content cards */}
         <div className="space-y-6">
-          <Card id="what-we-collect" title="1) Information we collect" icon="🧾">
-            <ul className="space-y-3 text-gray-300 text-sm leading-relaxed">
-              <li>
-                <span className="text-white font-semibold">Account info:</span>{" "}
-                email address, authentication identifiers, and a profile username
-                (you can edit it in your Profile page).
-              </li>
-              <li>
-                <span className="text-white font-semibold">Uploads:</span> MIDI
-                files (required) and optional PDF sheet music you upload, plus
-                metadata such as title, composer, genre, BPM, and the upload date.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Community content:</span>{" "}
-                comments you post and bookmarks you create.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Usage signals:</span>{" "}
-                basic operational logs needed to keep the service stable (e.g.,
-                preventing abuse or troubleshooting errors).
-              </li>
-            </ul>
+          <PolicyCard id="collect" icon={<Database />} title="1. Information we collect">
+            <div className="grid gap-4 md:grid-cols-2">
+              <MiniCard icon={<UserCircle2 />} title="Account information">
+                Email address, login identifiers, username, avatar, and profile details you choose to add.
+              </MiniCard>
+              <MiniCard icon={<FileMusic />} title="Uploads">
+                MIDI files, optional PDF scores, title, composer, genre, BPM, description, and upload date.
+              </MiniCard>
+              <MiniCard icon={<MessageSquare />} title="Community activity">
+                Comments, bookmarks, ratings, follows, and creator progress signals.
+              </MiniCard>
+              <MiniCard icon={<ShieldCheck />} title="Operational signals">
+                Basic logs used to keep the site stable, prevent abuse, and troubleshoot errors.
+              </MiniCard>
+            </div>
+          </PolicyCard>
 
-            <Notice>
-              We don’t sell your personal data. We only use it to run the app and
-              keep it safe.
-            </Notice>
-          </Card>
-
-          <Card id="how-we-use" title="2) How we use information" icon="⚙️">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300 leading-relaxed">
+          <PolicyCard id="use" icon={<SlidersHorizontal />} title="2. How we use information">
+            <div className="grid gap-4 md:grid-cols-2">
               <MiniCard title="Core features">
-                Authentication, profile username, uploads, comments, bookmarks,
-                search, and display of uploader/comment usernames.
+                Run login, profiles, uploads, downloads, comments, bookmarks, search, ratings, and creator awards.
               </MiniCard>
-              <MiniCard title="Safety & moderation">
-                Prevent spam/abuse, respond to reports, enforce Terms, and remove
-                content that violates policies.
-              </MiniCard>
-              <MiniCard title="Performance">
-                Improve page speed and reliability, diagnose bugs, and keep
-                storage organized.
+              <MiniCard title="Safety and moderation">
+                Respond to reports, review rights concerns, reduce spam, and enforce the Terms.
               </MiniCard>
               <MiniCard title="Support">
-                Respond to messages via the Contact page (if you provide your email).
+                Reply to messages sent through the contact form and keep context for follow-up.
+              </MiniCard>
+              <MiniCard title="Reliability">
+                Diagnose bugs, improve page speed, and keep file access working as expected.
               </MiniCard>
             </div>
-          </Card>
+          </PolicyCard>
 
-          <Card title="3) Where data is stored & processed" icon="🗄️">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              GiveMeMIDI uses secure account, database, and file storage systems
-              to provide login, uploads, downloads, comments, and bookmarks. File
-              access may be protected with temporary download links.
+          <PolicyCard icon={<FileMusic />} title="3. Files and visibility">
+            <p className="text-sm leading-7 text-slate-300">
+              Your username may be shown next to uploads and comments. Uploaded MIDI/PDF files may be available to other visitors depending on the page and access settings. Do not upload private files unless you are comfortable sharing them.
             </p>
+          </PolicyCard>
 
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <Pill label="Account" value="Login sessions" />
-              <Pill label="Library" value="MIDI records" />
-              <Pill label="Files" value="MIDI/PDF storage" />
-            </div>
-          </Card>
-
-          <Card title="4) Sharing & visibility" icon="👀">
-            <div className="space-y-3 text-gray-300 text-sm leading-relaxed">
-              <p>
-                Your <span className="text-white font-semibold">username</span>{" "}
-                may be shown publicly next to your uploads and comments.
-              </p>
-              <p>
-                Uploaded MIDI/PDF files may be available to other users depending
-                on how access is configured (public bucket, signed URLs, etc.).
-              </p>
-              <p>
-                We may disclose information if required by law or to protect the
-                safety and integrity of the service.
-              </p>
-            </div>
-          </Card>
-
-          <Card id="your-choices" title="5) Your choices & controls" icon="🧰">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300 leading-relaxed">
-              <MiniCard title="Edit your username">
-                Change your username in{" "}
-                <Link href="/profile" className="text-blue-300 hover:text-blue-200 font-semibold">
-                  Profile
+          <PolicyCard id="controls" icon={<ShieldCheck />} title="4. Your choices">
+            <div className="grid gap-4 md:grid-cols-2">
+              <MiniCard title="Profile">
+                Edit your username, bio, and avatar from the{" "}
+                <Link href="/profile" className="font-bold text-cyan-200 hover:text-white">
+                  profile page
                 </Link>
                 .
               </MiniCard>
-              <MiniCard title="Delete your comments">
-                You can delete your own comments from the MIDI detail page.
+              <MiniCard title="Uploads and comments">
+                Manage uploads from your uploads page and delete your own comments from MIDI detail pages.
               </MiniCard>
-              <MiniCard title="Manage uploads">
-                You can edit or remove your own uploads from your uploads page.
+              <MiniCard title="Bookmarks">
+                Save or remove favorites from the MIDI library and bookmarks page.
               </MiniCard>
-              <MiniCard title="Reset password">
-                Use the “Forgot password” flow (recommended) if you can’t sign in.
+              <MiniCard title="Account help">
+                For account deletion or data requests, contact support. Some records may be retained where required for safety or legal reasons.
               </MiniCard>
             </div>
+          </PolicyCard>
 
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-gray-300 leading-relaxed">
-                Want your account removed? Use the{" "}
-                <Link href="/contact" className="text-blue-300 hover:text-blue-200 font-semibold">
-                  Contact
-                </Link>{" "}
-                page and we’ll help you out (subject to legal and safety requirements).
-              </p>
-            </div>
-          </Card>
-
-          <Card title="6) Cookies" icon="🍪">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Authentication may rely on browser storage/cookies to keep you signed
-              in. We use these to provide core functionality (login, session
-              persistence). If you block cookies/storage, some features may not work.
+          <PolicyCard icon={<Cookie />} title="5. Cookies and browser storage">
+            <p className="text-sm leading-7 text-slate-300">
+              GiveMeMIDI uses browser storage or cookies for login sessions and core account functionality. Blocking storage may prevent login, bookmarks, uploads, and comments from working correctly.
             </p>
-          </Card>
+          </PolicyCard>
 
-          <Card title="7) Contact" icon="📬">
-            <p className="text-gray-300 text-sm leading-relaxed">
-              If you have questions about this policy, report a rights issue, or
-              request help with your data, reach out via{" "}
-              <Link href="/contact" className="text-blue-300 hover:text-blue-200 font-semibold">
-                Contact
+          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.045] to-cyan-300/10 p-6 md:p-8">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+              <div>
+                <h2 className="text-2xl font-black">Questions about your data?</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  Send a message if you need help with privacy, account access, or rights concerns.
+                </p>
+              </div>
+              <Link
+                href="/contact"
+                className="btn-glow inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-5 py-3 text-sm font-bold text-white"
+              >
+                Contact support
+                <ArrowRight size={16} />
               </Link>
-              .
-            </p>
-          </Card>
-
-          {/* Footer CTA */}
-          <div className="pt-4 flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/terms"
-              className="flex-1 inline-flex items-center justify-center px-4 py-3 rounded-2xl
-                         bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-400/30
-                         text-sm font-semibold transition"
-            >
-              Read Terms of Service →
-            </Link>
-            <Link
-              href="/contact"
-              className="flex-1 inline-flex items-center justify-center px-4 py-3 rounded-2xl
-                         bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400
-                         text-sm font-semibold shadow-lg transition"
-            >
-              Contact support →
-            </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
 
-function Card({
+function PolicyCard({
   id,
-  title,
   icon,
+  title,
   children,
 }: {
   id?: string;
+  icon: ReactNode;
   title: string;
-  icon: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section
-      id={id}
-      className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 shadow-xl"
-    >
-      <div className="flex items-start gap-3 mb-4">
-        <div className="h-10 w-10 rounded-2xl border border-white/10 bg-black/20 flex items-center justify-center">
-          <span className="text-lg">{icon}</span>
-        </div>
-        <div>
-          <h2 className="text-xl md:text-2xl font-extrabold">{title}</h2>
-          <div className="mt-1 h-px w-24 bg-gradient-to-r from-blue-500/60 to-indigo-500/60" />
-        </div>
+    <section id={id} className="scroll-mt-28 rounded-[2rem] border border-white/10 bg-white/[0.045] p-6 shadow-xl shadow-black/20 md:p-8">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-200 ring-1 ring-cyan-300/20">
+          {icon}
+        </span>
+        <h2 className="text-xl font-black md:text-2xl">{title}</h2>
       </div>
       {children}
     </section>
   );
 }
 
-function MiniCard({ title, children }: { title: string; children: React.ReactNode }) {
+function MiniCard({
+  icon,
+  title,
+  children,
+}: {
+  icon?: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <p className="text-white font-semibold">{title}</p>
-      <div className="mt-2 text-gray-300">{children}</div>
+    <div className="card-lift rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="flex items-center gap-2 font-bold text-white">
+        {icon ? <span className="text-cyan-300">{icon}</span> : null}
+        {title}
+      </p>
+      <div className="mt-2 text-sm leading-6 text-slate-400">{children}</div>
     </div>
-  );
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-5 rounded-2xl border border-blue-400/20 bg-blue-500/10 p-4 text-sm text-blue-100">
-      {children}
-    </div>
-  );
-}
-
-function Pill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-gray-200">{value}</p>
-    </div>
-  );
-}
-
-function QuickLink({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold
-                 hover:bg-white/10 hover:border-blue-400/30 transition"
-    >
-      {label}
-    </a>
   );
 }

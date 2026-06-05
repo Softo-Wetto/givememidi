@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { pocketbase } from "../../lib/pocketbaseClient";
+import { awardXp } from "@/lib/xp-client";
 import {
   ArrowDownUp,
   Loader2,
@@ -214,7 +215,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     };
     setComments((current) => [optimistic, ...current]);
 
-    const { error } = await pocketbase.from("midi_comments").insert({
+    const { data, error } = await pocketbase.from("midi_comments").insert({
       midi_id: midiId,
       user_id: userId,
       body: trimmed,
@@ -235,6 +236,8 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     }
 
     setBody("");
+    const created = data as { id?: string } | null;
+    await awardXp("comment", created?.id);
     fetchComments();
   };
 

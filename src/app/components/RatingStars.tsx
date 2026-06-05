@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Star, Loader2 } from "lucide-react";
 import { pocketbase } from "../../lib/pocketbaseClient";
+import { awardXp } from "@/lib/xp-client";
 
 type Props = {
   midiId: string;
@@ -87,7 +88,7 @@ export function RatingStars({ midiId, compact }: Props) {
     setSaving(true);
     try {
       // Upsert one rating per user per midi
-      const { error } = await pocketbase
+      const { data, error } = await pocketbase
         .from("midi_ratings")
         .upsert(
           { midi_id: midiId, user_id: userId, rating: value },
@@ -97,6 +98,7 @@ export function RatingStars({ midiId, compact }: Props) {
       if (error) throw error;
 
       setMyRating(value);
+      await awardXp("rating", (data as { id?: string } | null)?.id);
     } catch (e) {
       console.error("Upsert rating error:", e);
       alert("Could not save rating.");

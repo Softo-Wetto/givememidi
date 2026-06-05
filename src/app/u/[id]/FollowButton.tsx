@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { pocketbase } from "../../../lib/pocketbaseClient";
+import { awardXp } from "@/lib/xp-client";
 
 export default function FollowButton({ targetUserId }: { targetUserId: string }) {
   const router = useRouter();
@@ -59,7 +60,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
     setLoading(true);
 
     if (!following) {
-      const { error } = await pocketbase.from("follows").insert({
+      const { data, error } = await pocketbase.from("follows").insert({
         follower_id: me,
         following_id: targetUserId,
       });
@@ -68,6 +69,7 @@ export default function FollowButton({ targetUserId }: { targetUserId: string })
         alert("Failed to follow.");
       } else {
         setFollowing(true);
+        await awardXp("follow", (data as { id?: string } | null)?.id);
         router.refresh();
       }
     } else {

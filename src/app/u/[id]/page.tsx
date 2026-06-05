@@ -5,7 +5,7 @@ import Link from "next/link";
 import FollowButton from "./FollowButton";
 import { MidiCard } from "../../components/MidiCard";
 import { MidiRowScroller } from "../../components/MidiRowScroller";
-import { Star, TrendingUp, Music2, Trophy, Users } from "lucide-react";
+import { BadgeCheck, Star, TrendingUp, Music2, Trophy, Users } from "lucide-react";
 import {
   calculateCreatorPoints,
   getCreatorAwards,
@@ -23,6 +23,9 @@ type ProfileRow = {
   bio: string | null;
   avatar_url: string | null;
   created_at: string | null;
+  cosmetic_theme?: string | null;
+  banner_style?: string | null;
+  featured_badge?: string | null;
 };
 type RatingRow = { midi_id: string; rating: number | null };
 
@@ -34,6 +37,26 @@ function formatDate(iso?: string | null) {
     month: "short",
     day: "2-digit",
   }).format(d);
+}
+
+function profileShellClass(theme?: string | null) {
+  if (theme === "gold") {
+    return "rounded-3xl border border-yellow-300/25 bg-gradient-to-br from-yellow-300/10 via-white/[0.055] to-orange-500/10 p-8 shadow-2xl shadow-yellow-950/25 relative overflow-hidden";
+  }
+  if (theme === "neon") {
+    return "rounded-3xl border border-cyan-300/25 bg-gradient-to-br from-cyan-300/10 via-white/[0.055] to-blue-600/10 p-8 shadow-2xl shadow-cyan-950/25 relative overflow-hidden";
+  }
+  return "rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl relative overflow-hidden";
+}
+
+function bannerClass(style?: string | null) {
+  if (style === "aurora") {
+    return "bg-[radial-gradient(circle_at_15%_50%,rgba(34,211,238,0.35),transparent_26%),radial-gradient(circle_at_55%_20%,rgba(217,70,239,0.35),transparent_28%),linear-gradient(90deg,rgba(14,165,233,0.18),rgba(250,204,21,0.16))]";
+  }
+  if (style === "studio_wave") {
+    return "bg-[linear-gradient(135deg,rgba(37,99,235,0.28),rgba(8,47,73,0.2)),repeating-linear-gradient(90deg,rgba(125,211,252,0.18)_0_2px,transparent_2px_18px)]";
+  }
+  return "";
 }
 
 async function fetchRatingAggForMidiIds(ids: string[]) {
@@ -118,7 +141,7 @@ export default async function PublicProfilePage({ params }: Props) {
   // profile
   const { data: profile, error: profErr } = await pocketbase
     .from("profiles")
-    .select<ProfileRow>("id, username, bio, avatar_url, created_at")
+    .select<ProfileRow>("id, username, bio, avatar_url, created_at, cosmetic_theme, banner_style, featured_badge")
     .eq("id", id)
     .maybeSingle<ProfileRow>();
 
@@ -201,9 +224,12 @@ export default async function PublicProfilePage({ params }: Props) {
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-10 space-y-12">
         {/* Header */}
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-xl relative overflow-hidden">
+        <section className={profileShellClass(profile.cosmetic_theme)}>
+          {profile.banner_style ? (
+            <div className={`absolute inset-x-0 top-0 h-24 ${bannerClass(profile.banner_style)}`} />
+          ) : null}
           <div className="pointer-events-none absolute -top-24 right-0 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+          <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div className="flex items-start gap-5">
               {/* Avatar */}
               <div className="w-20 h-20 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
@@ -222,7 +248,15 @@ export default async function PublicProfilePage({ params }: Props) {
 
               <div>
                 <p className="text-sm text-gray-400">Creator profile</p>
-                <h1 className="text-4xl font-extrabold mt-1">{profile.username}</h1>
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <h1 className="text-4xl font-extrabold">{profile.username}</h1>
+                  {profile.featured_badge ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
+                      <BadgeCheck size={14} />
+                      {profile.featured_badge}
+                    </span>
+                  ) : null}
+                </div>
 
                 {profile.bio ? (
                   <p className="text-gray-300 mt-3 max-w-2xl leading-relaxed">{profile.bio}</p>
@@ -263,14 +297,14 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
 
           {/* Stats row */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<Users size={18} className="text-blue-300" />} label="Followers" value={String(followersCount ?? 0)} />
             <StatCard icon={<Users size={18} className="text-indigo-300" />} label="Following" value={String(followingCount ?? 0)} />
             <StatCard icon={<Music2 size={18} className="text-emerald-300" />} label="Uploads" value={String(totalUploads)} />
             <StatCard icon={<TrendingUp size={18} className="text-yellow-300" />} label="Total downloads" value={String(totalDownloads)} />
           </div>
 
-          <div className="mt-4 rounded-2xl border border-yellow-300/15 bg-gradient-to-r from-yellow-400/10 to-cyan-400/10 p-4">
+          <div className="relative mt-4 rounded-2xl border border-yellow-300/15 bg-gradient-to-r from-yellow-400/10 to-cyan-400/10 p-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-300/20 bg-yellow-300/10 text-yellow-200">
@@ -294,7 +328,7 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
 
           {/* Rating summary */}
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="relative mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-gray-300">
               <Star size={16} className="text-yellow-300" />
               <span className="font-semibold">Creator rating</span>

@@ -5,6 +5,7 @@ import { Music2, FileMusic, FileText, Info, Loader2 } from "lucide-react";
 import { createRecord, getCurrentAuth, updateRecord } from "@/lib/pocketbase/client";
 import { getPocketBaseFileUrl } from "@/lib/pocketbase/config";
 import type { MusicFile } from "@/lib/pocketbase/types";
+import { awardXp } from "@/lib/xp-client";
 
 export default function UploadClient() {
   const [title, setTitle] = useState("");
@@ -145,7 +146,13 @@ export default function UploadClient() {
         await updateRecord("music_files", created.id, updateForm);
       }
 
-      alert("Upload successful!");
+      const award = await awardXp("upload", created.id);
+      const event = award?.event;
+      alert(
+        event?.xp
+          ? `Upload successful! +${event.xp} XP and +${event.credits} credits earned.`
+          : "Upload successful!"
+      );
       setTitle("");
       setComposer("");
       setDescription("");

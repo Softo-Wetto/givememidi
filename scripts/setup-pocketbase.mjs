@@ -203,7 +203,7 @@ async function main() {
     type: "base",
     listRule: "",
     viewRule: "",
-    createRule: '@request.auth.id != ""',
+    createRule: null,
     updateRule: '@request.auth.id = user_id',
     deleteRule: '@request.auth.id = user_id',
     indexes: ["CREATE UNIQUE INDEX idx_profiles_legacy_id ON profiles (legacy_id)"],
@@ -213,6 +213,9 @@ async function main() {
       text("username", { required: true }),
       text("bio"),
       text("avatar_url"),
+      text("cosmetic_theme"),
+      text("banner_style"),
+      text("featured_badge"),
       file("avatar", { maxSize: 5242880, mimeTypes: ["image/png", "image/jpeg", "image/webp"] }),
       date("created_at"),
       date("updated_at"),
@@ -310,6 +313,56 @@ async function main() {
       text("subject"),
       text("message", { required: true }),
       date("created_at"),
+    ],
+  });
+
+  const xpEvents = await upsertCollection(token, {
+    name: "xp_events",
+    type: "base",
+    listRule: '@request.auth.id = user_id',
+    viewRule: '@request.auth.id = user_id',
+    createRule: null,
+    updateRule: null,
+    deleteRule: null,
+    indexes: [
+      "CREATE UNIQUE INDEX idx_xp_events_event_key ON xp_events (event_key)",
+      "CREATE INDEX idx_xp_events_user_id ON xp_events (user_id)",
+    ],
+    fields: [
+      relation("user_id", profiles.id, { required: true }),
+      text("event_key", { required: true }),
+      text("action", { required: true }),
+      text("label", { required: true }),
+      number("xp", { required: true }),
+      number("credits", { required: true }),
+      text("target_collection"),
+      text("target_id"),
+      text("metadata"),
+      date("created_at"),
+    ],
+  });
+
+  await upsertCollection(token, {
+    name: "user_rewards",
+    type: "base",
+    listRule: '@request.auth.id = user_id',
+    viewRule: '@request.auth.id = user_id',
+    createRule: null,
+    updateRule: null,
+    deleteRule: null,
+    indexes: [
+      "CREATE UNIQUE INDEX idx_user_rewards_unique ON user_rewards (user_id, item_key)",
+      "CREATE INDEX idx_user_rewards_user_id ON user_rewards (user_id)",
+    ],
+    fields: [
+      relation("user_id", profiles.id, { required: true }),
+      text("item_key", { required: true }),
+      text("item_type", { required: true }),
+      text("label", { required: true }),
+      text("description"),
+      text("metadata"),
+      date("created_at"),
+      relation("purchase_event", xpEvents.id),
     ],
   });
 

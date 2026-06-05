@@ -20,6 +20,7 @@ import {
   Mail,
   Sparkles,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { User as UserIcon } from "lucide-react";
 import { UploadCloud } from "lucide-react";
@@ -415,6 +416,23 @@ export function Header() {
                       </Link>
 
                       <Link
+                        href="/awards"
+                        onClick={() => setDiscoverOpen(false)}
+                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
+                        role="menuitem"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-yellow-300/10 text-yellow-100 ring-1 ring-yellow-200/15">
+                          <Trophy size={17} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-white">Awards & ranks</span>
+                          <span className="block truncate text-xs text-slate-400">
+                            Learn every rank, badge, and creator goal.
+                          </span>
+                        </span>
+                      </Link>
+
+                      <Link
                         href="/midi?sort=downloads"
                         onClick={() => setDiscoverOpen(false)}
                         className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
@@ -641,6 +659,15 @@ export function Header() {
               >
                 <Award size={16} className="text-amber-200" />
                 Top Creators
+              </Link>
+
+              <Link
+                href="/awards"
+                onClick={closeAll}
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-yellow-200/30 hover:text-white"
+              >
+                <Trophy size={16} className="text-yellow-100" />
+                Awards & ranks
               </Link>
 
               <Link
