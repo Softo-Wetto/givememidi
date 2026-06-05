@@ -178,19 +178,24 @@ async function resolveAward(
 }
 
 export async function POST(request: Request) {
-  const auth = await getServerAuth();
-  if (!auth?.user.id) return jsonError("Please log in.", 401);
+  try {
+    const auth = await getServerAuth();
+    if (!auth?.user.id) return jsonError("Please log in.", 401);
 
-  const payload = (await request.json().catch(() => null)) as AwardPayload | null;
-  if (!payload?.action || !payload.targetId) return jsonError("Missing award action.");
+    const payload = (await request.json().catch(() => null)) as AwardPayload | null;
+    if (!payload?.action || !payload.targetId) return jsonError("Missing award action.");
 
-  const award = await resolveAward(auth.user.id, payload);
-  if (!award) return jsonError("This action cannot be awarded.", 403);
+    const award = await resolveAward(auth.user.id, payload);
+    if (!award) return jsonError("This action cannot be awarded.", 403);
 
-  const result = await createAward(auth.user.id, award);
-  return NextResponse.json({
-    ok: true,
-    awarded: result.awarded,
-    event: result.event,
-  });
+    const result = await createAward(auth.user.id, award);
+    return NextResponse.json({
+      ok: true,
+      awarded: result.awarded,
+      event: result.event,
+    });
+  } catch (error) {
+    console.error("XP award error:", error);
+    return jsonError("Could not award XP right now.", 500);
+  }
 }

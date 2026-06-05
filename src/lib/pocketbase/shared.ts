@@ -10,6 +10,8 @@ type RequestOptions = RequestInit & {
   token?: string | null;
 };
 
+const BASE_URL = POCKETBASE_URL.replace(/\/+$/, "");
+
 export function normalizeRecord<T extends RawPocketBaseRecord>(
   record: T
 ): T & { created_at: string; updated_at: string } {
@@ -47,7 +49,7 @@ export async function pbRequest<T>(
   path: string,
   { token, headers, ...init }: RequestOptions = {}
 ): Promise<T> {
-  const response = await fetch(`${POCKETBASE_URL}${path}`, {
+  const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),

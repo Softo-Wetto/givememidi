@@ -84,6 +84,8 @@ export function CommentsSection({ midiId }: { midiId: string }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("newest");
   const [mineOnly, setMineOnly] = useState(false);
+  const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const canPost = !!userId;
   const remaining = MAX_COMMENT_LENGTH - body.length;
@@ -102,59 +104,67 @@ export function CommentsSection({ midiId }: { midiId: string }) {
 
   const fetchComments = async () => {
     setLoading(true);
+    setErrorMessage("");
 
-    const { data: commentData, error: commentErr } = await pocketbase
-      .from("midi_comments")
-      .select("id, body, created_at, user_id")
-      .eq("midi_id", midiId)
-      .order("created_at", { ascending: false });
+    try {
+      const { data: commentData, error: commentErr } = await pocketbase
+        .from("midi_comments")
+        .select("id, body, created_at, user_id")
+        .eq("midi_id", midiId)
+        .order("created_at", { ascending: false });
 
-    if (commentErr) {
-      console.error("Fetch comments error:", {
-        message: commentErr.message,
-        details: (commentErr as any).details,
-        hint: (commentErr as any).hint,
-        code: (commentErr as any).code,
-      });
-      setComments([]);
-      setLoading(false);
-      return;
-    }
-
-    const rows = (commentData ?? []) as CommentDbRow[];
-    const ids = Array.from(new Set(rows.map((row) => row.user_id))).filter(Boolean);
-    const usernameMap = new Map<string, string>();
-
-    if (ids.length > 0) {
-      const { data: profileData, error: profileErr } = await pocketbase
-        .from("profiles")
-        .select<ProfileRow>("id, username")
-        .in("id", ids);
-
-      if (profileErr) {
-        console.error("Fetch profiles error:", {
-          message: profileErr.message,
-          details: (profileErr as any).details,
-          hint: (profileErr as any).hint,
-          code: (profileErr as any).code,
+      if (commentErr) {
+        console.error("Fetch comments error:", {
+          message: commentErr.message,
+          details: (commentErr as any).details,
+          hint: (commentErr as any).hint,
+          code: (commentErr as any).code,
         });
-      } else {
-        (profileData ?? []).forEach((profile: ProfileRow) => {
-          usernameMap.set(profile.id, (profile.username ?? "Anonymous").trim() || "Anonymous");
-        });
+        setComments([]);
+        setErrorMessage("Comments could not be loaded. Try refreshing this section.");
+        return;
       }
-    }
 
-    setComments(
-      rows.map((row) => ({
-        id: row.id,
-        body: row.body,
-        created_at: row.created_at,
-        user_id: row.user_id,
-        username: usernameMap.get(row.user_id) ?? "Anonymous",
-      }))
-    );
-    setLoading(false);
+      const rows = (commentData ?? []) as CommentDbRow[];
+      const ids = Array.from(new Set(rows.map((row) => row.user_id))).filter(Boolean);
+      const usernameMap = new Map<string, string>();
+
+      if (ids.length > 0) {
+        const { data: profileData, error: profileErr } = await pocketbase
+          .from("profiles")
+          .select<ProfileRow>("id, username")
+          .in("id", ids);
+
+        if (profileErr) {
+          console.error("Fetch profiles error:", {
+            message: profileErr.message,
+            details: (profileErr as any).details,
+            hint: (profileErr as any).hint,
+            code: (profileErr as any).code,
+          });
+        } else {
+          (profileData ?? []).forEach((profile: ProfileRow) => {
+            usernameMap.set(profile.id, (profile.username ?? "Anonymous").trim() || "Anonymous");
+          });
+        }
+      }
+
+      setComments(
+        rows.map((row) => ({
+          id: row.id,
+          body: row.body,
+          created_at: row.created_at,
+          user_id: row.user_id,
+          username: usernameMap.get(row.user_id) ?? "Anonymous",
+        }))
+      );
+    } catch (error) {
+      console.error("Unexpected comments load error:", error);
+      setComments([]);
+      setErrorMessage("Comments could not be loaded. Try refreshing this section.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -204,6 +214,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     if (!trimmed) return;
 
     setPosting(true);
+    setErrorMessage("");
 
     const optimisticId = `local-${Date.now()}`;
     const optimistic: CommentRow = {
@@ -215,30 +226,29 @@ export function CommentsSection({ midiId }: { midiId: string }) {
     };
     setComments((current) => [optimistic, ...current]);
 
-    const { data, error } = await pocketbase.from("midi_comments").insert({
-      midi_id: midiId,
-      user_id: userId,
-      body: trimmed,
-    });
-
-    setPosting(false);
-
-    if (error) {
-      setComments((current) => current.filter((comment) => comment.id !== optimisticId));
-      console.error("Insert comment error:", {
-        message: error.message,
-        details: (error as any).details,
-        hint: (error as any).hint,
-        code: (error as any).code,
+    try {
+      const { data, error } = await pocketbase.from("midi_comments").insert({
+        midi_id: midiId,
+        user_id: userId,
+        body: trimmed,
       });
-      alert("Could not post comment.");
-      return;
-    }
 
-    setBody("");
-    const created = data as { id?: string } | null;
-    await awardXp("comment", created?.id);
-    fetchComments();
+      if (error) {
+        throw error;
+      }
+
+      setBody("");
+      setReplyTo(null);
+      const created = data as { id?: string } | null;
+      await awardXp("comment", created?.id);
+      await fetchComments();
+    } catch (error) {
+      setComments((current) => current.filter((comment) => comment.id !== optimisticId));
+      console.error("Insert comment error:", error);
+      setErrorMessage("Could not post that comment. Please try again.");
+    } finally {
+      setPosting(false);
+    }
   };
 
   const remove = async (comment: CommentRow) => {
@@ -270,6 +280,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
 
   const quote = (comment: CommentRow) => {
     const quoted = `@${comment.username} `;
+    setReplyTo(comment);
     setBody((current) => (current.startsWith(quoted) ? current : `${quoted}${current}`).slice(0, MAX_COMMENT_LENGTH));
   };
 
@@ -341,6 +352,19 @@ export function CommentsSection({ midiId }: { midiId: string }) {
             My comments only
           </button>
         ) : null}
+
+        {errorMessage ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+            <span>{errorMessage}</span>
+            <button
+              type="button"
+              onClick={fetchComments}
+              className="rounded-full border border-red-300/20 px-3 py-1 text-xs font-bold transition hover:bg-red-300/10"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-4 p-5">
@@ -378,6 +402,22 @@ export function CommentsSection({ midiId }: { midiId: string }) {
               placeholder="Share a thought, request, or practice note..."
               className="w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-3 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
             />
+
+            {replyTo ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-100">
+                <span>
+                  Replying to <span className="font-bold">{replyTo.username}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  className="rounded-full p-1 text-cyan-100/80 transition hover:bg-cyan-300/10 hover:text-white"
+                  title="Cancel reply"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : null}
 
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className={`text-xs ${remaining < 80 ? "text-orange-200" : "text-slate-500"}`}>
