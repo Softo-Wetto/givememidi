@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Midi } from "@tonejs/midi";
 import * as Tone from "tone";
-import { Play, Pause, Square, ZoomIn } from "lucide-react";
+import {
+  Activity,
+  ChevronLeft,
+  Layers,
+  MousePointer2,
+  Pause,
+  Play,
+  RotateCcw,
+  ScanLine,
+  Square,
+  ZoomIn,
+} from "lucide-react";
 
 type Props = {
   url: string;
-  height?: number; // canvas height in px
+  height?: number;
 };
 
 type NoteDraw = {
@@ -33,113 +45,114 @@ type HitRect = {
   note: NoteDraw;
 };
 
-const midiToNoteName = (m: number) => {
-  const names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-  const octave = Math.floor(m / 12) - 1;
-  return `${names[m % 12]}${octave}`;
-};
+const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-export function MidiPreview({ url, height = 240 }: Props) {
+function midiToNoteName(midi: number) {
+  const octave = Math.floor(midi / 12) - 1;
+  return `${noteNames[midi % 12]}${octave}`;
+}
+
+function formatSeconds(value: number) {
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  const decimals = Math.floor((value % 1) * 10);
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${decimals}`;
+}
+
+export function MidiPreview({ url, height = 260 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   const midiRef = useRef<Midi | null>(null);
   const notesRef = useRef<NoteDraw[]>([]);
   const hitRectsRef = useRef<HitRect[]>([]);
   const rafRef = useRef<number | null>(null);
-
   const synthRef = useRef<Tone.PolySynth | null>(null);
   const partRefs = useRef<Tone.Part[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [zoom, setZoom] = useState(1.4); // affects px/sec
+  const [zoom, setZoom] = useState(1.4);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-
+  const [durationSec, setDurationSec] = useState(0);
+  const [followPlayhead, setFollowPlayhead] = useState(true);
+  const [showVelocity, setShowVelocity] = useState(true);
   const [tracks, setTracks] = useState<TrackInfo[]>([]);
-  const [visibleTracks, setVisibleTracks] = useState<Set<number>>(new Set()); // track indices
-
-  const [hover, setHover] = useState<{
-    x: number;
-    y: number;
-    label: string;
-  } | null>(null);
+  const [visibleTracks, setVisibleTracks] = useState<Set<number>>(new Set());
+  const [selectedNote, setSelectedNote] = useState<NoteDraw | null>(null);
+  const [hover, setHover] = useState<{ x: number; y: number; label: string } | null>(null);
 
   const palette = useMemo(
-    () => ["#60a5fa", "#34d399", "#fbbf24", "#f472b6", "#a78bfa", "#fb7185"],
+    () => ["#60a5fa", "#34d399", "#fbbf24", "#f472b6", "#a78bfa", "#fb7185", "#22d3ee"],
     []
   );
 
-  const durationSec = useMemo(() => {
-    const ns = notesRef.current;
-    if (!ns.length) return 0;
-    return Math.max(...ns.map((n) => n.time + n.duration));
-  }, [tracks]); // re-evaluate after load
+  const pxPerSec = useMemo(() => 180 * zoom, [zoom]);
+  const activeTrackCount = tracks.filter((track) => track.noteCount > 0).length;
+  const visibleNoteCount = useMemo(
+    () => notesRef.current.filter((note) => visibleTracks.has(note.trackIndex)).length,
+    [visibleTracks]
+  );
+  const progress = durationSec > 0 ? Math.min(100, (currentTime / durationSec) * 100) : 0;
 
-  const pxPerSec = useMemo(() => 180 * zoom, [zoom]); // base density
-
-  // --- Load MIDI once ---
   useEffect(() => {
     let cancelled = false;
 
-    const load = async () => {
+    async function load() {
       setLoading(true);
       setError(null);
       setHover(null);
+      setSelectedNote(null);
+      setCurrentTime(0);
 
       try {
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error(`Failed to fetch MIDI (${res.status})`);
-        const buffer = await res.arrayBuffer();
-        const midi = new Midi(buffer);
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Failed to fetch MIDI (${response.status})`);
 
+        const midi = new Midi(await response.arrayBuffer());
         if (cancelled) return;
 
         midiRef.current = midi;
 
-        const flat: NoteDraw[] = [];
-        midi.tracks.forEach((t, ti) => {
-          t.notes.forEach((n, ni) => {
-            flat.push({
-              id: `${ti}-${ni}`,
-              time: n.time,
-              duration: n.duration,
-              midi: n.midi,
-              velocity: n.velocity,
-              trackIndex: ti,
+        const notes: NoteDraw[] = [];
+        midi.tracks.forEach((track, trackIndex) => {
+          track.notes.forEach((note, noteIndex) => {
+            notes.push({
+              id: `${trackIndex}-${noteIndex}`,
+              time: note.time,
+              duration: note.duration,
+              midi: note.midi,
+              velocity: note.velocity,
+              trackIndex,
             });
           });
         });
 
-        if (!flat.length) {
+        if (!notes.length) {
           setError("No notes found in this MIDI.");
           setLoading(false);
           return;
         }
 
-        notesRef.current = flat;
+        notesRef.current = notes;
+        setDurationSec(Math.max(...notes.map((note) => note.time + note.duration)));
 
-        const trackList: TrackInfo[] = midi.tracks.map((t, i) => ({
-          index: i,
-          name: t.name?.trim() || `Track ${i + 1}`,
-          noteCount: t.notes.length,
+        const trackList = midi.tracks.map((track, index) => ({
+          index,
+          name: track.name?.trim() || `Track ${index + 1}`,
+          noteCount: track.notes.length,
         }));
 
         setTracks(trackList);
-
-        // default: show all tracks that actually have notes
-        setVisibleTracks(new Set(trackList.filter(t => t.noteCount > 0).map(t => t.index)));
-
+        setVisibleTracks(new Set(trackList.filter((track) => track.noteCount > 0).map((track) => track.index)));
         setLoading(false);
-      } catch (e: any) {
+      } catch (err) {
         if (!cancelled) {
-          setError(e?.message || "Failed to load MIDI.");
+          setError(err instanceof Error ? err.message : "Failed to load MIDI.");
           setLoading(false);
         }
       }
-    };
+    }
 
     load();
 
@@ -148,7 +161,6 @@ export function MidiPreview({ url, height = 240 }: Props) {
     };
   }, [url]);
 
-  // --- Draw function ---
   const draw = () => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
@@ -157,46 +169,35 @@ export function MidiPreview({ url, height = 240 }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const cssW = Math.max(600, Math.floor(durationSec * pxPerSec)); // wide canvas for scroll
+    const cssW = Math.max(680, Math.floor(durationSec * pxPerSec));
     const cssH = height;
-
-    // crisp on retina
     const dpr = Math.max(1, window.devicePixelRatio || 1);
+
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // background
     ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = "rgba(255,255,255,0.04)";
+
+    const gradient = ctx.createLinearGradient(0, 0, cssW, cssH);
+    gradient.addColorStop(0, "rgba(59,130,246,0.10)");
+    gradient.addColorStop(0.45, "rgba(15,23,42,0.92)");
+    gradient.addColorStop(1, "rgba(34,211,238,0.08)");
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, cssW, cssH);
 
-    // grid (time)
-    const gridEverySec = 1; // 1s grid
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    for (let t = 0; t <= durationSec; t += gridEverySec) {
-      const x = t * pxPerSec;
+    for (let time = 0; time <= durationSec; time += 1) {
+      const x = time * pxPerSec;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, cssH);
       ctx.stroke();
     }
 
-    // pitch range
-    const all = notesRef.current.filter(n => visibleTracks.has(n.trackIndex));
-    const fallback = notesRef.current;
-    const used = all.length ? all : fallback;
-
-    const minPitch = Math.min(...used.map(n => n.midi));
-    const maxPitch = Math.max(...used.map(n => n.midi));
-    const range = Math.max(1, maxPitch - minPitch);
-    const pad = 12;
-
-    // pitch helper lines
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    for (let i = 1; i < 6; i++) {
+    for (let i = 1; i < 6; i += 1) {
       const y = (i / 6) * cssH;
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -204,73 +205,80 @@ export function MidiPreview({ url, height = 240 }: Props) {
       ctx.stroke();
     }
 
-    // draw notes + build hit rects
+    const visibleNotes = notesRef.current.filter((note) => visibleTracks.has(note.trackIndex));
+    const usedNotes = visibleNotes.length ? visibleNotes : notesRef.current;
+    const minPitch = Math.min(...usedNotes.map((note) => note.midi));
+    const maxPitch = Math.max(...usedNotes.map((note) => note.midi));
+    const range = Math.max(1, maxPitch - minPitch);
+    const pad = 14;
+
     hitRectsRef.current = [];
-    for (const n of notesRef.current) {
-      if (!visibleTracks.has(n.trackIndex)) continue;
+    for (const note of notesRef.current) {
+      if (!visibleTracks.has(note.trackIndex)) continue;
 
-      const x = n.time * pxPerSec;
-      const w = Math.max(2, n.duration * pxPerSec);
-      const yNorm = (n.midi - minPitch) / range; // 0..1
+      const x = note.time * pxPerSec;
+      const w = Math.max(3, note.duration * pxPerSec);
+      const yNorm = (note.midi - minPitch) / range;
       const y = (1 - yNorm) * (cssH - pad * 2) + pad;
+      const h = Math.max(5, Math.min(11, cssH / 23));
+      const color = palette[note.trackIndex % palette.length];
 
-      const h = Math.max(5, Math.min(10, (cssH / 24)));
-
-      const color = palette[n.trackIndex % palette.length];
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = showVelocity ? Math.max(0.32, note.velocity) : 0.9;
       ctx.fillStyle = color;
       ctx.fillRect(x, y - h / 2, w, h);
 
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = 0.34;
       ctx.fillStyle = "#fff";
       ctx.fillRect(x, y - h / 2, w, 1);
       ctx.globalAlpha = 1;
 
-      hitRectsRef.current.push({ x, y: y - h / 2, w, h, note: n });
+      if (selectedNote?.id === note.id) {
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - 1, y - h / 2 - 2, w + 2, h + 4);
+        ctx.lineWidth = 1;
+      }
+
+      hitRectsRef.current.push({ x, y: y - h / 2, w, h, note });
     }
 
-    // playhead
     const playX = currentTime * pxPerSec;
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(96,165,250,0.35)";
+    ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.moveTo(playX, 0);
     ctx.lineTo(playX, cssH);
     ctx.stroke();
 
-    // soft glow around playhead
-    ctx.strokeStyle = "rgba(96,165,250,0.35)";
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(255,255,255,0.70)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(playX, 0);
     ctx.lineTo(playX, cssH);
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    // border
     ctx.strokeStyle = "rgba(255,255,255,0.10)";
     ctx.strokeRect(0.5, 0.5, cssW - 1, cssH - 1);
   };
 
-  // redraw when relevant changes happen
   useEffect(() => {
     if (loading || error) return;
     draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, zoom, height, visibleTracks, currentTime]);
+  }, [loading, error, zoom, height, visibleTracks, currentTime, showVelocity, selectedNote]);
 
-  // --- Playback wiring ---
+  const disposeParts = () => {
+    partRefs.current.forEach((part) => part.dispose());
+    partRefs.current = [];
+  };
+
   const stopPlayback = async () => {
     setPlaying(false);
     Tone.Transport.stop();
-    Tone.Transport.position = 0 as any;
+    Tone.Transport.position = "0:0:0";
     setCurrentTime(0);
-
-    // clear scheduled parts
-    partRefs.current.forEach((p) => p.dispose());
-    partRefs.current = [];
-
-    // stop raf
+    disposeParts();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
   };
@@ -281,63 +289,52 @@ export function MidiPreview({ url, height = 240 }: Props) {
 
     await Tone.start();
 
-    // create synth once
     if (!synthRef.current) {
       synthRef.current = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "triangle" },
         envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.8 },
       }).toDestination();
-
-      // a bit nicer volume
       synthRef.current.volume.value = -10;
     }
 
-    // clear any previous parts
-    partRefs.current.forEach((p) => p.dispose());
-    partRefs.current = [];
+    disposeParts();
 
-    // schedule only visible tracks
-    midi.tracks.forEach((t, ti) => {
-      if (!visibleTracks.has(ti)) return;
-      if (!t.notes.length) return;
+    midi.tracks.forEach((track, trackIndex) => {
+      if (!visibleTracks.has(trackIndex) || !track.notes.length) return;
 
-      const events = t.notes.map((n) => ({
-        time: n.time,
-        midi: n.midi,
-        duration: n.duration,
-        velocity: n.velocity,
+      const events = track.notes.map((note) => ({
+        time: note.time,
+        midi: note.midi,
+        duration: note.duration,
+        velocity: note.velocity,
       }));
 
-      const part = new Tone.Part((time, ev: any) => {
-         const note = Tone.Frequency(ev.midi, "midi").toNote(); // e.g. "C4"
-         synthRef.current?.triggerAttackRelease(note, ev.duration, time, ev.velocity);
+      const part = new Tone.Part((time, event: { midi: number; duration: number; velocity: number }) => {
+        const noteName = Tone.Frequency(event.midi, "midi").toNote();
+        synthRef.current?.triggerAttackRelease(noteName, event.duration, time, event.velocity);
       }, events).start(0);
 
       partRefs.current.push(part);
     });
 
-    Tone.Transport.seconds = currentTime; // resume from playhead
+    Tone.Transport.seconds = currentTime;
     Tone.Transport.start();
-
     setPlaying(true);
 
-    // RAF loop updates playhead + auto-scroll
     const tick = () => {
-      const t = Tone.Transport.seconds;
-      setCurrentTime(t);
+      const time = Tone.Transport.seconds;
+      setCurrentTime(time);
 
       const wrap = wrapRef.current;
-      if (wrap) {
-        const x = t * pxPerSec;
+      if (wrap && followPlayhead) {
+        const x = time * pxPerSec;
         const viewLeft = wrap.scrollLeft;
         const viewRight = viewLeft + wrap.clientWidth;
-
-        // keep playhead in view
         if (x > viewRight - 120) wrap.scrollLeft = x - wrap.clientWidth + 120;
         if (x < viewLeft + 40) wrap.scrollLeft = Math.max(0, x - 40);
       }
 
-      if (t >= durationSec) {
+      if (time >= durationSec) {
         stopPlayback();
         return;
       }
@@ -359,110 +356,142 @@ export function MidiPreview({ url, height = 240 }: Props) {
     await startPlayback();
   };
 
-  // --- Hover tooltip + seek on click ---
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const findHit = (x: number, y: number) => {
+    return hitRectsRef.current.find((rect) => x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h);
+  };
+
+  const seekTo = (time: number) => {
+    const next = Math.max(0, Math.min(durationSec, time));
+    setCurrentTime(next);
+    Tone.Transport.seconds = next;
+  };
+
+  const handleProgressChange = (value: string) => {
+    seekTo((Number(value) / 100) * durationSec);
+  };
+
+  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    const wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
+    if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left; // in CSS px relative to canvas
-    const y = e.clientY - rect.top;
-
-    // hit test
-    const hits = hitRectsRef.current;
-    const found = hits.find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const found = findHit(x, y);
 
     if (!found) {
       setHover(null);
       return;
     }
 
-    const n = found.note;
-    const label = `${midiToNoteName(n.midi)} • ${n.time.toFixed(2)}s → ${(n.time + n.duration).toFixed(2)}s`;
-
+    const note = found.note;
     setHover({
       x: Math.min(x + 12, rect.width - 10),
       y: Math.max(10, y - 10),
-      label,
+      label: `${midiToNoteName(note.midi)} - ${note.time.toFixed(2)}s to ${(note.time + note.duration).toFixed(2)}s`,
     });
   };
 
-  const handleMouseLeave = () => setHover(null);
-
-  const seekToX = (x: number) => {
-    const t = Math.max(0, Math.min(durationSec, x / pxPerSec));
-    setCurrentTime(t);
-    if (playing) {
-      // reposition transport while playing
-      Tone.Transport.seconds = t;
-    }
-  };
-
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    seekToX(x);
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const hit = findHit(x, y);
+    setSelectedNote(hit?.note ?? null);
+    seekTo(hit?.note.time ?? x / pxPerSec);
   };
 
-  // --- Track toggles ---
-  const toggleTrack = async (idx: number) => {
-    setVisibleTracks((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+  const toggleTrack = async (index: number) => {
+    setVisibleTracks((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
       return next;
     });
 
-    // if currently playing, restart scheduling with new tracks
     if (playing) {
       Tone.Transport.pause();
-      partRefs.current.forEach((p) => p.dispose());
-      partRefs.current = [];
+      disposeParts();
       await startPlayback();
     }
   };
 
-  // cleanup on unmount
+  const setAllTracks = (on: boolean) => {
+    const active = tracks.filter((track) => track.noteCount > 0).map((track) => track.index);
+    setVisibleTracks(new Set(on ? active : []));
+  };
+
+  const scrollToStart = () => {
+    seekTo(0);
+    if (wrapRef.current) wrapRef.current.scrollLeft = 0;
+  };
+
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
-      partRefs.current.forEach((p) => p.dispose());
-      partRefs.current = [];
+      disposeParts();
       Tone.Transport.stop();
     };
   }, []);
 
   if (loading) {
     return (
-      <div className="w-full rounded-xl border border-white/10 bg-white/5 p-6 text-gray-300">
-        Rendering MIDI preview…
+      <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+        <div className="mb-4 flex items-center gap-2 text-sm font-bold text-cyan-200">
+          <Activity className="animate-pulse" size={18} />
+          Rendering MIDI preview...
+        </div>
+        <div className="skeleton h-56 rounded-2xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-full rounded-xl border border-white/10 bg-white/5 p-6 text-gray-400">
-        {error}
+      <div className="w-full rounded-3xl border border-white/10 bg-white/[0.045] p-6 text-gray-400">
+        <div className="flex items-center gap-2 font-bold text-white">
+          <ScanLine size={18} className="text-cyan-300" />
+          Preview unavailable
+        </div>
+        <p className="mt-2 text-sm">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Controls */}
+    <div className="space-y-4 rounded-3xl border border-white/10 bg-black/20 p-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <PreviewStat label="Duration" value={formatSeconds(durationSec)} />
+        <PreviewStat label="Visible notes" value={String(visibleNoteCount)} />
+        <PreviewStat label="Tracks" value={`${visibleTracks.size}/${activeTrackCount}`} />
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+        <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+          <span className="tabular-nums">{formatSeconds(currentTime)}</span>
+          <span className="tabular-nums">{formatSeconds(durationSec)}</span>
+        </div>
+        <input
+          aria-label="MIDI preview progress"
+          type="range"
+          min={0}
+          max={100}
+          step={0.1}
+          value={progress}
+          onChange={(event) => handleProgressChange(event.target.value)}
+          className="w-full accent-cyan-300"
+        />
+      </div>
+
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={togglePlay}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
-              bg-gradient-to-r from-blue-500 to-indigo-500
-              hover:from-blue-400 hover:to-indigo-400
-              font-semibold text-white shadow-lg transition"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-400 hover:to-indigo-400"
           >
             {playing ? <Pause size={16} /> : <Play size={16} />}
             {playing ? "Pause" : "Play"}
@@ -470,17 +499,20 @@ export function MidiPreview({ url, height = 240 }: Props) {
 
           <button
             onClick={stopPlayback}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
-              border border-white/10 bg-white/5 text-gray-200
-              hover:bg-white/10 transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-gray-200 transition hover:bg-white/10"
           >
             <Square size={16} />
             Stop
           </button>
 
-          <div className="ml-2 text-sm text-gray-400 tabular-nums">
-            {currentTime.toFixed(2)}s / {durationSec.toFixed(2)}s
-          </div>
+          <button
+            onClick={scrollToStart}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-gray-200 transition hover:bg-white/10"
+            title="Return to start"
+          >
+            <ChevronLeft size={16} />
+            Start
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
@@ -488,60 +520,84 @@ export function MidiPreview({ url, height = 240 }: Props) {
             <ZoomIn size={16} className="text-gray-400" />
             Zoom
           </div>
-
           <input
             type="range"
             min={0.8}
             max={3.5}
             step={0.1}
             value={zoom}
-            onChange={(e) => setZoom(parseFloat(e.target.value))}
-            className="w-48"
+            onChange={(event) => setZoom(Number(event.target.value))}
+            className="w-44 accent-cyan-300"
           />
+          <button
+            onClick={() => setZoom(1.4)}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10"
+            title="Reset zoom"
+          >
+            <RotateCcw size={15} />
+          </button>
         </div>
       </div>
 
-      {/* Track toggles */}
       <div className="flex flex-wrap gap-2">
+        <TogglePill active={followPlayhead} onClick={() => setFollowPlayhead((value) => !value)}>
+          Follow playhead
+        </TogglePill>
+        <TogglePill active={showVelocity} onClick={() => setShowVelocity((value) => !value)}>
+          Velocity shading
+        </TogglePill>
+        <button
+          onClick={() => setAllTracks(true)}
+          className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/35 hover:text-white"
+        >
+          Show all
+        </button>
+        <button
+          onClick={() => setAllTracks(false)}
+          className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/35 hover:text-white"
+        >
+          Hide all
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-1 pr-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+          <Layers size={14} />
+          Tracks
+        </div>
         {tracks
-          .filter((t) => t.noteCount > 0)
-          .map((t) => {
-            const on = visibleTracks.has(t.index);
+          .filter((track) => track.noteCount > 0)
+          .map((track) => {
+            const on = visibleTracks.has(track.index);
             return (
               <button
-                key={t.index}
-                onClick={() => toggleTrack(t.index)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition
-                  ${on
+                key={track.index}
+                onClick={() => toggleTrack(track.index)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  on
                     ? "border-blue-400/40 bg-blue-500/10 text-blue-200"
                     : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
-                  }`}
-                title={`${t.noteCount} notes`}
+                }`}
+                title={`${track.noteCount} notes`}
               >
-                {t.name}
+                {track.name}
               </button>
             );
           })}
       </div>
 
-      {/* Scrollable canvas */}
-      <div
-        ref={wrapRef}
-        className="relative w-full overflow-x-auto rounded-xl border border-white/10 bg-black/30"
-      >
+      <div ref={wrapRef} className="relative w-full overflow-x-auto rounded-2xl border border-white/10 bg-black/30">
         <canvas
           ref={canvasRef}
-          className="block"
+          className="block cursor-crosshair"
           onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
+          onMouseLeave={() => setHover(null)}
           onClick={handleClick}
         />
 
-        {/* Hover tooltip */}
         {hover && (
           <div
-            className="pointer-events-none absolute px-2 py-1 rounded-md text-xs
-              bg-black/80 border border-white/10 text-gray-100 shadow"
+            className="pointer-events-none absolute rounded-md border border-white/10 bg-black/80 px-2 py-1 text-xs text-gray-100 shadow"
             style={{ left: hover.x, top: hover.y }}
           >
             {hover.label}
@@ -549,9 +605,56 @@ export function MidiPreview({ url, height = 240 }: Props) {
         )}
       </div>
 
-      <p className="text-xs text-gray-500">
-        Tip: click anywhere on the roll to seek. Use track toggles to isolate parts.
-      </p>
+      {selectedNote ? (
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-50">
+          <div className="flex items-center gap-2 font-bold">
+            <MousePointer2 size={15} />
+            Selected note
+          </div>
+          <p className="mt-1 text-xs text-cyan-100/80">
+            {midiToNoteName(selectedNote.midi)} on{" "}
+            {tracks.find((track) => track.index === selectedNote.trackIndex)?.name ?? "Track"} starts at{" "}
+            {selectedNote.time.toFixed(2)}s, lasts {selectedNote.duration.toFixed(2)}s, velocity{" "}
+            {Math.round(selectedNote.velocity * 100)}%.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500">
+          Tip: click a note to inspect it, or click empty space on the roll to seek. Use track toggles to isolate parts.
+        </p>
+      )}
     </div>
+  );
+}
+
+function PreviewStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function TogglePill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+        active
+          ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-100"
+          : "border-white/10 bg-white/[0.045] text-slate-400 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

@@ -290,21 +290,39 @@ const { data, error } = await pocketbase
 
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-3 space-y-8">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-xl">
-              <h2 className="text-xl font-semibold mb-4">MIDI Preview</h2>
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-xl">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300/80">
+                    Piano roll
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">MIDI Preview</h2>
+                </div>
+                <span className="hidden rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs text-slate-400 sm:inline">
+                  Interactive
+                </span>
+              </div>
               <MidiPreview url={midiSigned} />
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-xl">
-              <h2 className="text-xl font-semibold mb-4">Sheet Music Preview</h2>
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 shadow-xl">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300/80">
+                    Score
+                  </p>
+                  <h2 className="mt-1 text-xl font-black">Sheet Music Preview</h2>
+                </div>
+                <span className="hidden rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs text-slate-400 sm:inline">
+                  PDF viewer
+                </span>
+              </div>
               {pdfSigned ? (
-                <div className="w-full h-[720px]">
-                  <PdfPreview url={pdfSigned} />
+                <div className="w-full min-h-[720px]">
+                  <PdfPreview url={pdfSigned} title={`${data.title} sheet music`} />
                 </div>
               ) : (
-                <div className="h-[360px] flex items-center justify-center bg-gray-900/50 border border-white/10 rounded-xl text-gray-400">
-                  No PDF Preview Available
-                </div>
+                <PdfPreview url={null} title={`${data.title} sheet music`} />
               )}
             </div>
           </div>
