@@ -159,9 +159,9 @@ const { data, error } = await pocketbase
             backgroundSize: "cover",
           }}
         >
-          <div className="pointer-events-none absolute inset-0 bg-black/45" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.14),transparent_34%),radial-gradient(circle_at_86%_0%,rgba(99,102,241,0.13),transparent_30%)]" />
-          <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="pointer-events-none absolute inset-0 z-0 bg-black/45" />
+          <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.14),transparent_34%),radial-gradient(circle_at_86%_0%,rgba(99,102,241,0.13),transparent_30%)]" />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
                 <span className="text-blue-300">🎵</span> MIDI Detail
@@ -245,7 +245,7 @@ const { data, error } = await pocketbase
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="relative z-10 mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label="Genre" value={data.genre || "—"} />
             <Stat label="BPM" value={data.bpm ? String(data.bpm) : "—"} />
             <Stat label="Downloads" value={String((data.downloads ?? 0) + 1)} />
@@ -253,7 +253,7 @@ const { data, error } = await pocketbase
           </div>
 
           {data.description ? (
-            <div className="mt-8 overflow-hidden rounded-3xl border border-blue-300/15 bg-gradient-to-br from-blue-400/10 via-white/[0.045] to-indigo-400/10 p-6 shadow-xl shadow-blue-950/20">
+            <div className="relative z-10 mt-8 overflow-hidden rounded-3xl border border-blue-300/15 bg-gradient-to-br from-blue-400/10 via-white/[0.045] to-indigo-400/10 p-6 shadow-xl shadow-blue-950/20">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
                 Arrangement notes
               </div>
@@ -263,7 +263,7 @@ const { data, error } = await pocketbase
             </div>
           ) : null}
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-4">
+          <div className="relative z-10 mt-8 flex flex-col sm:flex-row gap-4">
             <a
               href={midiSigned}
               download={`${data.title}.mid`}
@@ -294,11 +294,12 @@ const { data, error } = await pocketbase
             )}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+          <div className="relative z-10 mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
             <span className="font-semibold text-white">Quick tip:</span>{" "}
             Use the preview before downloading, then bookmark the file if it belongs in your reference library.
           </div>
 
+          <div className="relative z-10">
           {creatorStats ? (
             <CreatorAwardPanel
               username={data.uploader?.username ?? "Anonymous"}
@@ -306,6 +307,7 @@ const { data, error } = await pocketbase
               stats={creatorStats}
             />
           ) : null}
+          </div>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-8">
