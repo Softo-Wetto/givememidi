@@ -154,12 +154,13 @@ const { data, error } = await pocketbase
           className="hover-shine relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] p-8 shadow-xl"
           style={{
             backgroundImage:
-              "linear-gradient(135deg, rgba(2,6,23,0.94), rgba(15,23,42,0.78) 48%, rgba(37,99,235,0.32)), url('/sheet-music-placeholder.png')",
+              "linear-gradient(135deg, rgba(0,0,0,0.98), rgba(2,6,23,0.96) 48%, rgba(15,23,42,0.94)), url('/sheet-music-placeholder.png')",
             backgroundPosition: "center",
             backgroundSize: "cover",
           }}
         >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.2),transparent_34%),radial-gradient(circle_at_86%_0%,rgba(99,102,241,0.2),transparent_30%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-black/45" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.14),transparent_34%),radial-gradient(circle_at_86%_0%,rgba(99,102,241,0.13),transparent_30%)]" />
           <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
