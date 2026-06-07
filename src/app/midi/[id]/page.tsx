@@ -7,8 +7,9 @@ import { CommentsSection } from "../../components/CommentsSection";
 import { RatingStars } from "../../components/RatingStars";
 import { ShareButton } from "../../components/ShareButton";
 import { MidiCard } from "../../components/MidiCard";
+import { ProfileAvatar } from "../../components/ProfileAvatar";
 import Link from "next/link";
-import { Award, Trophy } from "lucide-react";
+import { Award } from "lucide-react";
 import {
   calculateCreatorPoints,
   getCreatorAwards,
@@ -32,7 +33,7 @@ type MidiRow = {
   pdf_url: string | null;
   downloads: number | null;
   created_at: string | null;
-  uploader?: { id: string; username: string | null } | null;
+  uploader?: { id: string; username: string | null; avatar_url?: string | null } | null;
 };
 type CreatorStats = {
   uploads: number;
@@ -53,7 +54,8 @@ const { data, error } = await pocketbase
     *,
     uploader:profiles (
       id,
-      username
+      username,
+      avatar_url
     )
   `)
   .eq("id", id)
@@ -148,8 +150,17 @@ const { data, error } = await pocketbase
       </div>
 
       <div className="relative max-w-6xl mx-auto px-6 py-10 space-y-10">
-        <section className="hover-shine bg-white/[0.055] border border-white/10 rounded-3xl p-8 shadow-xl">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <section
+          className="hover-shine relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] p-8 shadow-xl"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, rgba(2,6,23,0.94), rgba(15,23,42,0.78) 48%, rgba(37,99,235,0.32)), url('/sheet-music-placeholder.png')",
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+          }}
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.2),transparent_34%),radial-gradient(circle_at_86%_0%,rgba(99,102,241,0.2),transparent_30%)]" />
+          <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300">
                 <span className="text-blue-300">🎵</span> MIDI Detail
@@ -171,16 +182,23 @@ const { data, error } = await pocketbase
                 {data.composer || "Unknown Composer"}
               </p>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-400">
               <span>Uploaded by</span>
-              <span className="font-semibold text-gray-200">
+              {data.uploader?.id ? (
                 <Link
-                  href={`/u/${data.uploader?.id}`}
-                  className="font-semibold text-gray-200 hover:text-blue-300 transition"
+                  href={`/u/${data.uploader.id}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 py-1 pl-1 pr-3 font-semibold text-gray-100 transition hover:border-cyan-300/40 hover:text-cyan-100"
                 >
-                  {data.uploader?.username ?? "Anonymous"}
+                  <ProfileAvatar
+                    src={data.uploader.avatar_url}
+                    name={data.uploader.username}
+                    sizeClassName="h-8 w-8"
+                  />
+                  {data.uploader.username ?? "Anonymous"}
                 </Link>
-              </span>
+              ) : (
+                <span className="font-semibold text-gray-200">Anonymous</span>
+              )}
 
               <span className="text-gray-600">•</span>
 
@@ -283,6 +301,7 @@ const { data, error } = await pocketbase
           {creatorStats ? (
             <CreatorAwardPanel
               username={data.uploader?.username ?? "Anonymous"}
+              avatarUrl={data.uploader?.avatar_url}
               stats={creatorStats}
             />
           ) : null}
@@ -366,9 +385,11 @@ const { data, error } = await pocketbase
 
 function CreatorAwardPanel({
   username,
+  avatarUrl,
   stats,
 }: {
   username: string;
+  avatarUrl?: string | null;
   stats: CreatorStats;
 }) {
   const points = calculateCreatorPoints(stats);
@@ -380,9 +401,7 @@ function CreatorAwardPanel({
     <div className="mt-6 rounded-3xl border border-yellow-300/15 bg-gradient-to-br from-yellow-400/12 via-white/[0.045] to-blue-500/10 p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-300/25 bg-yellow-300/10 text-yellow-200">
-            <Trophy size={24} />
-          </div>
+          <ProfileAvatar src={avatarUrl} name={username} sizeClassName="h-12 w-12" />
           <div>
             <p className="text-sm text-slate-400">Uploader reward level</p>
             <h3 className="text-xl font-black text-white">{level.label}</h3>

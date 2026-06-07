@@ -78,6 +78,11 @@ export default function ProfilePage() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarZoom, setAvatarZoom] = useState(1);
+  const [avatarOffsetX, setAvatarOffsetX] = useState(0);
+  const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [cosmeticTheme, setCosmeticTheme] = useState<string | null>(null);
   const [bannerStyle, setBannerStyle] = useState<string | null>(null);
   const [featuredBadge, setFeaturedBadge] = useState<string | null>(null);
@@ -215,6 +220,12 @@ export default function ProfilePage() {
     })();
   }, [router]);
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    };
+  }, [avatarPreviewUrl]);
+
   const saveProfile = async () => {
     const clean = username.trim();
     const cleanBio = bio.trim();
@@ -248,8 +259,73 @@ export default function ProfilePage() {
       return;
     }
 
+    window.dispatchEvent(
+      new CustomEvent("givememidi:profile-updated", {
+        detail: { username: clean, avatarUrl },
+      })
+    );
+
     alert("Profile updated!");
   };
+
+  function selectAvatarFile(file: File) {
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    setAvatarDraftFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    setAvatarZoom(1);
+    setAvatarOffsetX(0);
+    setAvatarOffsetY(0);
+  }
+
+  function cancelAvatarDraft() {
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    setAvatarDraftFile(null);
+    setAvatarPreviewUrl(null);
+    setAvatarZoom(1);
+    setAvatarOffsetX(0);
+    setAvatarOffsetY(0);
+  }
+
+  async function createCroppedAvatar(file: File, previewUrl: string) {
+    const image = new window.Image();
+
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Could not load avatar preview."));
+      image.src = previewUrl;
+    });
+
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare avatar crop.");
+
+    context.fillStyle = "#020617";
+    context.fillRect(0, 0, size, size);
+
+    const baseScale = Math.max(size / image.naturalWidth, size / image.naturalHeight);
+    const scale = baseScale * avatarZoom;
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    const maxShiftX = Math.max(0, (drawWidth - size) / 2);
+    const maxShiftY = Math.max(0, (drawHeight - size) / 2);
+    const drawX = (size - drawWidth) / 2 + (avatarOffsetX / 100) * maxShiftX;
+    const drawY = (size - drawHeight) / 2 + (avatarOffsetY / 100) * maxShiftY;
+
+    context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) resolve(result);
+        else reject(new Error("Could not export avatar crop."));
+      }, "image/png");
+    });
+
+    const cleanName = file.name.replace(/\.[^.]+$/, "") || "avatar";
+    return new File([blob], `${cleanName}-avatar.png`, { type: "image/png" });
+  }
 
   const uploadAvatar = async (file: File) => {
     setUploadingAvatar(true);
@@ -275,11 +351,28 @@ export default function ProfilePage() {
       await updateRecord<ProfileRow>("profiles", user.id, { avatar_url: publicUrl });
 
       setAvatarUrl(publicUrl);
+      window.dispatchEvent(
+        new CustomEvent("givememidi:profile-updated", {
+          detail: { username, avatarUrl: publicUrl },
+        })
+      );
+      cancelAvatarDraft();
     } catch (e: any) {
       console.error(e);
       alert(e?.message || "Avatar upload failed.");
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const saveAvatarDraft = async () => {
+    if (!avatarDraftFile || !avatarPreviewUrl) return;
+
+    try {
+      const croppedAvatar = await createCroppedAvatar(avatarDraftFile, avatarPreviewUrl);
+      await uploadAvatar(croppedAvatar);
+    } catch (e: any) {
+      alert(e?.message || "Avatar crop failed.");
     }
   };
 
@@ -543,23 +636,106 @@ export default function ProfilePage() {
           {/* Avatar uploader */}
           <div className="mb-6">
             <label className="block text-sm text-gray-300 mb-2">Avatar</label>
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl
-                                 border border-white/10 bg-white/5 hover:bg-white/10 transition cursor-pointer">
-                <UploadCloud size={16} className="text-blue-300" />
-                {uploadingAvatar ? "Uploading..." : "Upload avatar"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadAvatar(f);
-                  }}
-                />
-              </label>
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative h-36 w-36 overflow-hidden rounded-full border border-cyan-300/25 bg-slate-950 shadow-[0_0_34px_rgba(34,211,238,0.16)]">
+                    {avatarPreviewUrl || avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatarPreviewUrl || avatarUrl || ""}
+                        alt="Avatar preview"
+                        className="h-full w-full object-cover"
+                        style={
+                          avatarPreviewUrl
+                            ? {
+                                transform: `translate(${avatarOffsetX * 0.18}%, ${avatarOffsetY * 0.18}%) scale(${avatarZoom})`,
+                              }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-4xl text-slate-500">
+                        👤
+                      </div>
+                    )}
+                    <div className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-black/35" />
+                  </div>
 
-              <p className="text-xs text-gray-500">PNG/JPG/WebP. Square works best.</p>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10">
+                    <UploadCloud size={16} className="text-blue-300" />
+                    Choose image
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) selectAvatarFile(f);
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Position your profile icon</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      Pick an image, then adjust zoom and position so it lands cleanly inside the circle.
+                    </p>
+                  </div>
+
+                  <AvatarRange
+                    label="Zoom"
+                    min={1}
+                    max={2.4}
+                    step={0.05}
+                    value={avatarZoom}
+                    disabled={!avatarPreviewUrl}
+                    onChange={setAvatarZoom}
+                  />
+                  <AvatarRange
+                    label="Horizontal"
+                    min={-100}
+                    max={100}
+                    step={1}
+                    value={avatarOffsetX}
+                    disabled={!avatarPreviewUrl}
+                    onChange={setAvatarOffsetX}
+                  />
+                  <AvatarRange
+                    label="Vertical"
+                    min={-100}
+                    max={100}
+                    step={1}
+                    value={avatarOffsetY}
+                    disabled={!avatarPreviewUrl}
+                    onChange={setAvatarOffsetY}
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={saveAvatarDraft}
+                      disabled={!avatarPreviewUrl || uploadingAvatar}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+                    >
+                      {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {uploadingAvatar ? "Saving..." : "Save avatar"}
+                    </button>
+                    {avatarPreviewUrl ? (
+                      <button
+                        type="button"
+                        onClick={cancelAvatarDraft}
+                        disabled={uploadingAvatar}
+                        className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -669,5 +845,44 @@ export default function ProfilePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function AvatarRange({
+  label,
+  min,
+  max,
+  step,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs text-gray-400">
+        <span>{label}</span>
+        <span className="font-semibold text-gray-300">
+          {label === "Zoom" ? `${Math.round(value * 100)}%` : value}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full accent-cyan-400 disabled:opacity-40"
+      />
+    </label>
   );
 }

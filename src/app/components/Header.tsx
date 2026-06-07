@@ -27,9 +27,11 @@ import { UploadCloud } from "lucide-react";
 import { pocketbase } from "../../lib/pocketbaseClient";
 import { useAuth } from "./AuthProvider";
 import { Users } from "lucide-react";
+import { ProfileAvatar } from "./ProfileAvatar";
 
 type ProfileRow = {
   username: string | null;
+  avatar_url: string | null;
 };
 
 type SearchSuggestion = {
@@ -53,6 +55,7 @@ export function Header() {
 
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
@@ -148,12 +151,13 @@ export function Header() {
     const loadUsername = async () => {
       if (!user) {
         setUsername(null);
+        setAvatarUrl(null);
         return;
       }
 
       const { data: prof, error } = await pocketbase
         .from("profiles")
-        .select("username")
+        .select("username, avatar_url")
         .eq("id", user.id)
         .maybeSingle<ProfileRow>();
 
@@ -162,10 +166,12 @@ export function Header() {
       if (error) {
         console.error("Header profile fetch error:", error);
         setUsername(null);
+        setAvatarUrl(null);
         return;
       }
 
       setUsername(prof?.username ?? null);
+      setAvatarUrl(prof?.avatar_url ?? null);
     };
 
     loadUsername();
@@ -174,6 +180,18 @@ export function Header() {
       alive = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    const handleProfileUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ username?: string; avatarUrl?: string | null }>).detail;
+      if (!detail) return;
+      if (typeof detail.username === "string") setUsername(detail.username);
+      if ("avatarUrl" in detail) setAvatarUrl(detail.avatarUrl ?? null);
+    };
+
+    window.addEventListener("givememidi:profile-updated", handleProfileUpdate);
+    return () => window.removeEventListener("givememidi:profile-updated", handleProfileUpdate);
+  }, []);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -504,9 +522,11 @@ export function Header() {
                     shadow-[0_0_0_rgba(0,0,0,0)] hover:shadow-[0_0_18px_rgba(96,165,250,0.15)]"
                   title={user.email ?? "Account"}
                 >
-                  <span className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-800 border border-gray-700">
-                    <UserIcon size={16} className="text-blue-300" />
-                  </span>
+                  <ProfileAvatar
+                    src={avatarUrl}
+                    name={username ?? user.email}
+                    sizeClassName="h-9 w-9"
+                  />
 
                   <div className="hidden lg:flex flex-col leading-tight text-left">
                     <span className="text-sm font-semibold text-white max-w-[140px] truncate">
@@ -526,13 +546,22 @@ export function Header() {
                       animate-in fade-in zoom-in-95"
                   >
                     <div className="px-4 py-3 border-b border-gray-700">
-                      <p className="text-xs text-gray-400">Signed in as</p>
-                      <p className="truncate text-sm font-semibold text-white">
-                        {username ?? "User"}
-                      </p>
-                      <p className="truncate text-xs text-gray-400 mt-0.5">
-                        {user.email}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <ProfileAvatar
+                          src={avatarUrl}
+                          name={username ?? user.email}
+                          sizeClassName="h-11 w-11"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-400">Signed in as</p>
+                          <p className="truncate text-sm font-semibold text-white">
+                            {username ?? "User"}
+                          </p>
+                          <p className="truncate text-xs text-gray-400 mt-0.5">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="py-1">
@@ -710,7 +739,11 @@ export function Header() {
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                       border border-gray-700 text-gray-200 hover:border-blue-400 transition"
                   >
-                    <UserIcon size={16} className="text-blue-300" />
+                    <ProfileAvatar
+                      src={avatarUrl}
+                      name={username ?? user.email}
+                      sizeClassName="h-6 w-6"
+                    />
                     Profile
                   </Link>
 

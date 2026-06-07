@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { pocketbase } from "../../lib/pocketbaseClient";
+import { ProfileAvatar } from "../components/ProfileAvatar";
 import {
   Loader2,
   Users,
@@ -17,6 +18,7 @@ import {
 type ProfileRow = {
   id: string;
   username: string | null;
+  avatar_url?: string | null;
   created_at?: string | null;
 };
 
@@ -104,6 +106,7 @@ export default function FollowingPage() {
           profiles:following_id (
             id,
             username,
+            avatar_url,
             created_at
           )
         `
@@ -140,6 +143,7 @@ export default function FollowingPage() {
         profiles:follower_id (
           id,
           username,
+          avatar_url,
           created_at
         )
       `
@@ -352,13 +356,20 @@ export default function FollowingPage() {
                   className="rounded-2xl border border-white/10 bg-black/20 p-4 hover:bg-black/30 transition"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-lg font-semibold text-white truncate">
-                        {p.username ?? "User"}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Member since {formatDate(p.created_at ?? null)}
-                      </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProfileAvatar
+                        src={p.avatar_url}
+                        name={p.username}
+                        sizeClassName="h-12 w-12"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-lg font-semibold text-white truncate">
+                          {p.username ?? "User"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Member since {formatDate(p.created_at ?? null)}
+                        </p>
+                      </div>
                     </div>
 
                     <Link
