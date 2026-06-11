@@ -441,6 +441,7 @@ export default function AllMidiClientPage() {
                   bpm={midi.bpm}
                   avgRating={midi.avgRating}
                   ratingCount={midi.ratingCount}
+                  createdAt={midi.created_at}
                 />
               ))}
             </div>

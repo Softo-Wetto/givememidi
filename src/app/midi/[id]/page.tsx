@@ -135,7 +135,7 @@ const { data, error } = await pocketbase
   const { data: relatedRows, error: relatedErr } = data.genre
     ? await pocketbase
         .from("music_files")
-        .select<MidiRow>("id,title,composer,downloads,pdf_url,genre,bpm")
+        .select<MidiRow>("id,title,composer,downloads,pdf_url,genre,bpm,created_at")
         .eq("genre", data.genre)
         .neq("id", data.id)
         .limit(4)
@@ -376,6 +376,7 @@ const { data, error } = await pocketbase
                   pdfUrl={midi.pdf_url}
                   genre={midi.genre}
                   bpm={midi.bpm}
+                  createdAt={midi.created_at}
                 />
               ))}
             </div>

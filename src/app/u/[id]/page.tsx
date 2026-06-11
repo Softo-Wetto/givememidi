@@ -366,8 +366,11 @@ export default async function PublicProfilePage({ params }: Props) {
                       composer={midi.composer}
                       downloads={midi.downloads}
                       pdfUrl={midi.pdf_url || null}
+                      genre={midi.genre}
+                      bpm={midi.bpm}
                       avgRating={avgRating}
                       ratingCount={ratingCount}
+                      createdAt={midi.created_at}
                     />
                   </div>
                 );
@@ -397,8 +400,11 @@ export default async function PublicProfilePage({ params }: Props) {
                     composer={m.composer}
                     downloads={m.downloads}
                     pdfUrl={m.pdf_url || null}
+                    genre={m.genre}
+                    bpm={m.bpm}
                     avgRating={avgRating}
                     ratingCount={ratingCount}
+                    createdAt={m.created_at}
                   />
                 </div>
               ))}
@@ -426,8 +432,11 @@ export default async function PublicProfilePage({ params }: Props) {
                       composer={m.composer}
                       downloads={m.downloads}
                       pdfUrl={m.pdf_url || null}
+                      genre={m.genre}
+                      bpm={m.bpm}
                       avgRating={avgRating}
                       ratingCount={ratingCount}
+                      createdAt={m.created_at}
                     />
                   </div>
                 );

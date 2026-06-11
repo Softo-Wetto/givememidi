@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Download, FileText, Music2, Star } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarDays,
+  Clock3,
+  Download,
+  FileText,
+  Music2,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { BookmarkButton } from "./BookmarkButton";
 
 type MidiCardProps = {
@@ -15,6 +24,8 @@ type MidiCardProps = {
   bpm?: number | null;
   avgRating?: number | null;
   ratingCount?: number | null;
+  createdAt?: string | null;
+  durationSeconds?: number | string | null;
 };
 
 export function MidiCard({
@@ -27,14 +38,18 @@ export function MidiCard({
   bpm,
   avgRating,
   ratingCount,
+  createdAt,
+  durationSeconds,
 }: MidiCardProps) {
   const hasRatings = (ratingCount ?? 0) > 0;
+  const uploadedLabel = formatUploadedDate(createdAt);
+  const durationLabel = formatDuration(durationSeconds);
 
   return (
     <motion.article
       whileHover={{ y: -5 }}
       transition={{ type: "spring", stiffness: 360, damping: 28 }}
-      className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] shadow-lg shadow-black/20 backdrop-blur transition hover:border-blue-300/35 hover:bg-white/[0.08]"
+      className="group relative h-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-b from-white/[0.075] to-white/[0.04] shadow-xl shadow-black/20 backdrop-blur transition hover:border-blue-300/35 hover:bg-white/[0.09]"
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent opacity-0 transition group-hover:opacity-100" />
 
@@ -43,9 +58,14 @@ export function MidiCard({
       </div>
 
       <Link href={`/midi/${id}`} className="flex h-full flex-col p-4">
-        <PdfArtwork title={title} composer={composer} genre={genre} hasPdf={Boolean(pdfUrl)} />
+        <PdfArtwork
+          genre={genre}
+          hasPdf={Boolean(pdfUrl)}
+          uploadedLabel={uploadedLabel}
+          durationLabel={durationLabel}
+        />
 
-        <div className="min-h-[72px]">
+        <div className="min-h-[78px]">
           <h3 className="line-clamp-2 text-lg font-bold leading-snug text-white transition group-hover:text-blue-100">
             {title}
           </h3>
@@ -54,8 +74,28 @@ export function MidiCard({
           </p>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs text-gray-400">
-          <span className="inline-flex items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-300">
+          {uploadedLabel ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1">
+              <CalendarDays size={12} className="text-cyan-200" />
+              {uploadedLabel}
+            </span>
+          ) : null}
+          {durationLabel ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1">
+              <Clock3 size={12} className="text-cyan-200" />
+              {durationLabel}
+            </span>
+          ) : null}
+          {bpm ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1">
+              {bpm} BPM
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-auto grid grid-cols-2 gap-2 border-t border-white/10 pt-4 text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-2.5 py-2">
             <Star
               size={14}
               className={hasRatings ? "fill-yellow-300 text-yellow-300" : "text-gray-600"}
@@ -70,17 +110,13 @@ export function MidiCard({
             )}
           </span>
 
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center justify-end gap-1.5 rounded-xl border border-white/10 bg-black/20 px-2.5 py-2">
             <Download size={14} className="text-blue-300" />
             {downloads ?? 0}
           </span>
-
-          {bpm ? (
-            <span className="rounded-full bg-white/5 px-2 py-1 text-gray-300">{bpm} BPM</span>
-          ) : null}
         </div>
 
-        <div className="mt-4 inline-flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition group-hover:border-blue-300/30 group-hover:bg-blue-400/10">
+        <div className="mt-3 inline-flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition group-hover:border-blue-300/30 group-hover:bg-blue-400/10">
           Open details
           <ArrowUpRight size={16} className="transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </div>
@@ -89,16 +125,45 @@ export function MidiCard({
   );
 }
 
+function formatUploadedDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatDuration(value?: number | string | null) {
+  if (value === null || value === undefined || value === "") return null;
+  const seconds = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+
+  const rounded = Math.round(seconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  if (mins >= 60) {
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return `${hours}:${String(remainingMins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
 function PdfArtwork({
-  title,
-  composer,
   genre,
   hasPdf,
+  uploadedLabel,
+  durationLabel,
 }: {
-  title: string;
-  composer?: string | null;
   genre?: string | null;
   hasPdf: boolean;
+  uploadedLabel: string | null;
+  durationLabel: string | null;
 }) {
   return (
     <div className="pdf-card-art relative mb-4 h-44 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-black">
@@ -142,6 +207,25 @@ function PdfArtwork({
 
       <div className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-blue-200 ring-1 ring-white/10 backdrop-blur">
         <Music2 size={22} />
+      </div>
+
+      <div className="absolute right-4 top-4 flex flex-col items-end gap-2">
+        {durationLabel ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-xs font-semibold text-slate-200 backdrop-blur">
+            <Clock3 size={12} />
+            {durationLabel}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-xs font-semibold text-slate-200 backdrop-blur">
+            <Sparkles size={12} />
+            Preview
+          </span>
+        )}
+        {uploadedLabel ? (
+          <span className="hidden rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[11px] font-semibold text-slate-300 backdrop-blur sm:inline-flex">
+            {uploadedLabel}
+          </span>
+        ) : null}
       </div>
 
       <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">

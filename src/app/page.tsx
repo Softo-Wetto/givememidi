@@ -29,6 +29,9 @@ type MidiRow = {
   pdf_url?: string | null;
   genre?: string | null;
   bpm?: number | null;
+  created_at?: string | null;
+  duration_seconds?: number | string | null;
+  duration?: number | string | null;
 };
 
 type RatingAgg = { sum: number; count: number };
@@ -432,6 +435,8 @@ function MidiSection({
                   bpm={midi.bpm}
                   avgRating={avgRating}
                   ratingCount={ratingCount}
+                  createdAt={midi.created_at}
+                  durationSeconds={midi.duration_seconds ?? midi.duration}
                 />
               </div>
             );
