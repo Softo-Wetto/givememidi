@@ -59,6 +59,7 @@ export function MidiCard({
 
       <Link href={`/midi/${id}`} className="flex h-full flex-col p-4">
         <PdfArtwork
+          seed={id}
           genre={genre}
           hasPdf={Boolean(pdfUrl)}
           uploadedLabel={uploadedLabel}
@@ -155,25 +156,69 @@ function formatDuration(value?: number | string | null) {
 }
 
 function PdfArtwork({
+  seed,
   genre,
   hasPdf,
   uploadedLabel,
   durationLabel,
 }: {
+  seed: string;
   genre?: string | null;
   hasPdf: boolean;
   uploadedLabel: string | null;
   durationLabel: string | null;
 }) {
+  const variants = [
+    {
+      glow: "bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.24),transparent_44%)]",
+      icon: "bg-blue-600",
+      ink: "bg-blue-500/20",
+      shadow: "shadow-blue-950/40",
+      page: "group-hover:rotate-[-1deg]",
+      ghost: "-rotate-6 border-blue-200/20 bg-blue-100/10",
+    },
+    {
+      glow: "bg-[radial-gradient(circle_at_78%_12%,rgba(34,211,238,0.22),transparent_42%)]",
+      icon: "bg-cyan-600",
+      ink: "bg-cyan-500/20",
+      shadow: "shadow-cyan-950/40",
+      page: "rotate-[1deg] group-hover:rotate-[2deg]",
+      ghost: "rotate-6 border-cyan-200/20 bg-cyan-100/10",
+    },
+    {
+      glow: "bg-[radial-gradient(circle_at_22%_72%,rgba(129,140,248,0.22),transparent_46%)]",
+      icon: "bg-indigo-600",
+      ink: "bg-indigo-500/20",
+      shadow: "shadow-indigo-950/40",
+      page: "rotate-[-1deg] group-hover:rotate-[-2deg]",
+      ghost: "rotate-3 border-indigo-200/20 bg-indigo-100/10",
+    },
+    {
+      glow: "bg-[radial-gradient(circle_at_72%_74%,rgba(16,185,129,0.18),transparent_44%)]",
+      icon: "bg-emerald-600",
+      ink: "bg-emerald-500/20",
+      shadow: "shadow-emerald-950/40",
+      page: "group-hover:rotate-[1deg]",
+      ghost: "-rotate-3 border-emerald-200/20 bg-emerald-100/10",
+    },
+  ] as const;
+  const variantIndex = hashSeed(seed) % variants.length;
+  const variant = variants[variantIndex];
+
   return (
     <div className="pdf-card-art relative mb-4 h-44 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-black">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.20),transparent_44%),linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:auto,22px_22px,22px_22px]" />
+      <div className={`absolute inset-0 ${variant.glow}`} />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:22px_22px]" />
 
-      <div className="absolute left-1/2 top-5 h-[142px] w-[104px] -translate-x-1/2 rounded-lg border border-slate-200/80 bg-slate-100 shadow-2xl shadow-blue-950/40 transition duration-300 group-hover:-translate-y-1 group-hover:rotate-[-1deg]">
+      <div
+        className={`absolute left-1/2 top-7 h-[132px] w-[98px] -translate-x-1/2 rounded-lg border ${variant.ghost} transition duration-300 group-hover:translate-y-0.5`}
+      />
+
+      <div className={`absolute left-1/2 top-5 h-[142px] w-[104px] -translate-x-1/2 rounded-lg border border-slate-200/80 bg-slate-100 shadow-2xl transition duration-300 group-hover:-translate-y-1 ${variant.shadow} ${variant.page}`}>
         <div className="absolute right-0 top-0 h-0 w-0 border-l-[18px] border-t-[18px] border-l-slate-300 border-t-white" />
         <div className="px-4 pt-5">
           <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white">
+            <div className={`flex h-7 w-7 items-center justify-center rounded-md text-white ${variant.icon}`}>
               <FileText size={15} />
             </div>
             <div>
@@ -194,13 +239,19 @@ function PdfArtwork({
               <span
                 key={index}
                 className="h-1 rounded-full bg-slate-700/80"
-                style={{ opacity: 0.28 + ((index * 7) % 5) * 0.12 }}
+                style={{
+                  opacity: 0.24 + ((index * (variantIndex + 5)) % 6) * 0.1,
+                  transform: `translateX(${((index + variantIndex) % 3) * 1.5}px)`,
+                }}
               />
             ))}
           </div>
 
           <div className="mt-4 h-7 rounded-md border border-slate-300 bg-white/70">
-            <div className="h-full w-2/3 rounded-l-md bg-blue-500/20" />
+            <div
+              className={`h-full rounded-l-md ${variant.ink}`}
+              style={{ width: `${55 + variantIndex * 10}%` }}
+            />
           </div>
         </div>
       </div>
@@ -246,4 +297,12 @@ function PdfArtwork({
 
     </div>
   );
+}
+
+function hashSeed(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
