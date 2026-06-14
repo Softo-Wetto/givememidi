@@ -9,7 +9,8 @@ import { ShareButton } from "../../components/ShareButton";
 import { MidiCard } from "../../components/MidiCard";
 import { ProfileAvatar } from "../../components/ProfileAvatar";
 import Link from "next/link";
-import { Award } from "lucide-react";
+import { Award, LogIn } from "lucide-react";
+import { getServerUser } from "@/lib/pocketbase/server";
 import {
   calculateCreatorPoints,
   getCreatorAwards,
@@ -47,6 +48,7 @@ type CreatorStats = {
 export default async function MidiDetail({ params }: Props) {
   // ✅ works in both Next “params sync” and “params async” modes
   const { id } = await Promise.resolve(params);
+  const viewer = await getServerUser();
 
 const { data, error } = await pocketbase
   .from("music_files")
@@ -124,14 +126,9 @@ const { data, error } = await pocketbase
     };
   }
 
-  // increment download count (you may want to move this to a "download click" later)
-  await pocketbase
-    .from("music_files")
-    .update({ downloads: (data.downloads ?? 0) + 1 })
-    .eq("id", id);
-
   const midiSigned = data.midi_url;
   const pdfSigned = data.pdf_url || null;
+  const loginHref = `/login?redirect=${encodeURIComponent(`/midi/${data.id}`)}`;
   const { data: relatedRows, error: relatedErr } = data.genre
     ? await pocketbase
         .from("music_files")
@@ -248,7 +245,7 @@ const { data, error } = await pocketbase
           <div className="relative z-10 mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label="Genre" value={data.genre || "—"} />
             <Stat label="BPM" value={data.bpm ? String(data.bpm) : "—"} />
-            <Stat label="Downloads" value={String((data.downloads ?? 0) + 1)} />
+            <Stat label="Downloads" value={String(data.downloads ?? 0)} />
             <Stat label="Formats" value={`MIDI${data.pdf_url ? " + PDF" : ""}`} />
           </div>
 
@@ -263,10 +260,10 @@ const { data, error } = await pocketbase
             </div>
           ) : null}
 
-          <div className="relative z-10 mt-8 flex flex-col sm:flex-row gap-4">
+          <div className="relative z-10 mt-8 flex flex-col gap-4 sm:flex-row">
+            {viewer ? (
             <a
-              href={midiSigned}
-              download={`${data.title}.mid`}
+              href={`/api/download/${data.id}/midi`}
               className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl
                          bg-gradient-to-r from-blue-500 to-indigo-500
                          hover:from-blue-400 hover:to-indigo-400
@@ -274,11 +271,19 @@ const { data, error } = await pocketbase
             >
               🎵 Download MIDI
             </a>
+            ) : (
+              <Link
+                href={loginHref}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-blue-300/25 bg-blue-400/10 px-6 py-4 font-semibold text-blue-100 transition hover:bg-blue-400/15"
+              >
+                <LogIn size={18} />
+                Sign in to download MIDI
+              </Link>
+            )}
 
-            {pdfSigned ? (
+            {pdfSigned && viewer ? (
               <a
-                href={pdfSigned}
-                download={`${data.title}.pdf`}
+                href={`/api/download/${data.id}/pdf`}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl
                            bg-gradient-to-r from-green-500 to-emerald-500
                            hover:from-green-400 hover:to-emerald-400
@@ -286,6 +291,14 @@ const { data, error } = await pocketbase
               >
                 📄 Download Sheet Music (PDF)
               </a>
+            ) : pdfSigned ? (
+              <Link
+                href={loginHref}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-6 py-4 font-semibold text-emerald-100 transition hover:bg-emerald-400/15"
+              >
+                <LogIn size={18} />
+                Sign in to download PDF
+              </Link>
             ) : (
               <div className="flex-1 flex items-center justify-center px-6 py-4 rounded-2xl
                               border border-white/10 bg-white/5 text-gray-400">
@@ -341,10 +354,21 @@ const { data, error } = await pocketbase
               </div>
               {pdfSigned ? (
                 <div className="w-full min-h-[720px]">
-                  <PdfPreview url={pdfSigned} title={`${data.title} sheet music`} />
+                  <PdfPreview
+                    url={pdfSigned}
+                    title={`${data.title} sheet music`}
+                    canDownload={Boolean(viewer)}
+                    downloadUrl={`/api/download/${data.id}/pdf`}
+                    loginHref={loginHref}
+                  />
                 </div>
               ) : (
-                <PdfPreview url={null} title={`${data.title} sheet music`} />
+                <PdfPreview
+                  url={null}
+                  title={`${data.title} sheet music`}
+                  canDownload={Boolean(viewer)}
+                  loginHref={loginHref}
+                />
               )}
             </div>
           </div>

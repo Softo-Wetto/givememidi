@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Download,
   ExternalLink,
   FileText,
+  LogIn,
   Loader2,
-  Maximize2,
   RotateCcw,
   ZoomIn,
   ZoomOut,
@@ -15,11 +16,20 @@ import {
 type Props = {
   url?: string | null;
   title?: string;
+  canDownload?: boolean;
+  downloadUrl?: string | null;
+  loginHref?: string;
 };
 
 type FitMode = "FitH" | "FitV" | "Fit";
 
-export function PdfPreview({ url, title = "Sheet music" }: Props) {
+export function PdfPreview({
+  url,
+  title = "Sheet music",
+  canDownload = false,
+  downloadUrl,
+  loginHref = "/login",
+}: Props) {
   const [loaded, setLoaded] = useState(false);
   const [zoom, setZoom] = useState(90);
   const [fitMode, setFitMode] = useState<FitMode>("FitH");
@@ -103,23 +113,34 @@ export function PdfPreview({ url, title = "Sheet music" }: Props) {
             <option value="FitV">Fit height</option>
             <option value="Fit">Fit page</option>
           </select>
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-xl border border-white/10 bg-white/[0.045] p-2 text-slate-300 transition hover:bg-white/10"
-            title="Open in new tab"
-          >
-            <ExternalLink size={16} />
-          </a>
-          <a
-            href={url}
-            download
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:brightness-110"
-          >
-            <Download size={15} />
-            Download
-          </a>
+          {canDownload ? (
+            <>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-white/10 bg-white/[0.045] p-2 text-slate-300 transition hover:bg-white/10"
+                title="Open in new tab"
+              >
+                <ExternalLink size={16} />
+              </a>
+              <a
+                href={downloadUrl || url}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:brightness-110"
+              >
+                <Download size={15} />
+                Download
+              </a>
+            </>
+          ) : (
+            <Link
+              href={loginHref}
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
+            >
+              <LogIn size={15} />
+              Sign in to download
+            </Link>
+          )}
         </div>
       </div>
 
