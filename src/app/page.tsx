@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { MidiCard } from "./components/MidiCard";
 import { MidiRowScroller } from "./components/MidiRowScroller";
+import { FloatingNotes } from "./components/FloatingNotes";
+import { AnimateIn } from "./components/AnimateIn";
 
 export const dynamic = "force-dynamic";
 
@@ -156,8 +158,23 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <section className="relative overflow-hidden border-b border-white/10">
+        {/* Grid */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
+        {/* Aurora blobs */}
+        <div
+          className="aurora-spot opacity-70"
+          style={{ width: "45%", height: "55%", background: "radial-gradient(circle, rgba(59,130,246,0.18), transparent 70%)", top: "-10%", left: "-8%", "--dur": "13s", "--dx": "4%", "--dy": "5%" } as React.CSSProperties}
+        />
+        <div
+          className="aurora-spot opacity-60"
+          style={{ width: "38%", height: "45%", background: "radial-gradient(circle, rgba(139,92,246,0.14), transparent 70%)", bottom: "-8%", right: "8%", "--dur": "11s", "--dx": "-4%", "--dy": "-3%" } as React.CSSProperties}
+        />
+        <div
+          className="aurora-spot opacity-50"
+          style={{ width: "28%", height: "35%", background: "radial-gradient(circle, rgba(34,211,238,0.12), transparent 70%)", top: "25%", right: "18%", "--dur": "9s", "--dx": "3%", "--dy": "-5%" } as React.CSSProperties}
+        />
+        <FloatingNotes />
 
         <div className="relative mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-16 md:grid-cols-[1.05fr_0.95fr] md:pb-18 md:pt-24">
           <div>
@@ -167,7 +184,9 @@ export default async function Home() {
             </div>
 
             <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight md:text-6xl">
-              Find the MIDI that gets your idea moving.
+              Find the{" "}
+              <span className="gradient-text">MIDI</span>{" "}
+              that gets your idea moving.
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
@@ -177,21 +196,21 @@ export default async function Home() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/midi"
-                className="btn-glow tap inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg shadow-blue-950/40 transition hover:brightness-110"
+                className="btn-glow btn-press inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg shadow-blue-950/40"
               >
                 <Search size={18} />
                 Browse MIDI
               </Link>
               <Link
                 href="/upload"
-                className="tap inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
+                className="btn-press inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
               >
                 <UploadCloud size={18} />
                 Upload a file
               </Link>
             </div>
 
-            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3 stagger-children">
               <Stat label="Popular picks" value={hasPopular ? `${popularMidis!.length} featured` : "None yet"} />
               <Stat label="New uploads" value={hasLatest ? `${latestMidis!.length} latest` : "None yet"} />
               <Stat label="Sheet music" value={hasPdf ? `${pdfMidis!.length} with PDF` : "None yet"} />
@@ -213,9 +232,10 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5 shadow-2xl shadow-blue-950/20 backdrop-blur">
+          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5 shadow-2xl shadow-blue-950/20 backdrop-blur glow-blue">
             <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(59,130,246,0.14),transparent_35%),linear-gradient(315deg,rgba(34,211,238,0.12),transparent_35%)]" />
-            <div className="relative flex h-full flex-col justify-between">
+            <div className="scan-line" />
+            <div className="relative flex h-full flex-col justify-between" style={{ zIndex: 2 }}>
               <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-200">
                   <Music2 size={16} className="text-cyan-300" />
@@ -263,130 +283,163 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto max-w-7xl px-6 pt-10">
-        <div className="grid gap-4 lg:grid-cols-4">
-          <DiscoveryTile
-            icon={<Flame size={20} />}
-            label="Popular"
-            value={hasPopular ? `${popularMidis!.length} picks` : "Starting soon"}
-            href="/midi?sort=downloads"
-          />
-          <DiscoveryTile
-            icon={<Star size={20} />}
-            label="Top rated"
-            value={hasTopRated ? `${topRatedOrdered.length} favorites` : "Needs ratings"}
-            href="/midi"
-          />
-          <DiscoveryTile
-            icon={<FileText size={20} />}
-            label="Sheet music"
-            value={hasPdf ? `${pdfMidis!.length} PDFs` : "Upload PDFs"}
-            href="/midi"
-          />
-          <DiscoveryTile
-            icon={<Users size={20} />}
-            label="Creators"
-            value={totalDownloads > 0 ? `${totalDownloads} downloads` : "Join in"}
-            href="/creators"
-          />
-        </div>
+        <AnimateIn direction="up" delay={0.05}>
+          <div className="grid gap-4 lg:grid-cols-4 stagger-children">
+            <DiscoveryTile
+              icon={<Flame size={20} className="text-orange-400" />}
+              label="Popular"
+              value={hasPopular ? `${popularMidis!.length} picks` : "Starting soon"}
+              href="/midi?sort=downloads"
+              colorClass="tile-flame"
+              iconBg="bg-orange-400/10 ring-orange-400/20"
+            />
+            <DiscoveryTile
+              icon={<Star size={20} className="text-yellow-400" />}
+              label="Top rated"
+              value={hasTopRated ? `${topRatedOrdered.length} favorites` : "Needs ratings"}
+              href="/midi"
+              colorClass="tile-gold"
+              iconBg="bg-yellow-400/10 ring-yellow-400/20"
+            />
+            <DiscoveryTile
+              icon={<FileText size={20} className="text-emerald-400" />}
+              label="Sheet music"
+              value={hasPdf ? `${pdfMidis!.length} PDFs` : "Upload PDFs"}
+              href="/midi"
+              colorClass="tile-emerald"
+              iconBg="bg-emerald-400/10 ring-emerald-400/20"
+            />
+            <DiscoveryTile
+              icon={<Users size={20} className="text-violet-400" />}
+              label="Creators"
+              value={totalDownloads > 0 ? `${totalDownloads} downloads` : "Join in"}
+              href="/creators"
+              colorClass="tile-violet"
+              iconBg="bg-violet-400/10 ring-violet-400/20"
+            />
+          </div>
+        </AnimateIn>
       </section>
 
       <section className="mx-auto max-w-7xl space-y-14 px-6 pb-24 pt-12">
-        <div className="hover-shine rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.045] to-cyan-300/10 p-6 shadow-xl shadow-black/20 md:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/80">
-                Creator rewards
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">
-                Uploads should feel worth it.
-              </h2>
-              <p className="mt-3 max-w-2xl leading-7 text-slate-300">
-                GiveMeMIDI highlights creator momentum through ratings, bookmarks, downloads, and upload progress, so contributors get more than a quiet file listing.
-              </p>
-            </div>
+        <AnimateIn direction="up">
+          <div className="hover-shine border-glow rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.045] to-cyan-300/10 p-6 shadow-xl shadow-black/20 md:p-8">
+            <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/80">
+                  Creator rewards
+                </p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">
+                  Uploads should feel{" "}
+                  <span className="text-gradient-brand">worth it.</span>
+                </h2>
+                <p className="mt-3 max-w-2xl leading-7 text-slate-300">
+                  GiveMeMIDI highlights creator momentum through ratings, bookmarks, downloads, and upload progress, so contributors get more than a quiet file listing.
+                </p>
+              </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              <RewardMetric label="Rate" value="Stars" />
-              <RewardMetric label="Collect" value="Bookmarks" />
-              <RewardMetric label="Share" value="Uploads" />
-            </div>
-          </div>
-        </div>
-
-        <MidiSection
-          title="Popular MIDI files"
-          subtitle="The most downloaded files right now."
-          href="/midi?sort=downloads"
-          linkLabel="View all"
-          rows={(popularMidis ?? []) as MidiRow[]}
-          getAvg={getAvg}
-          emptyTitle="No popular files yet"
-          emptySubtitle="Once people start downloading, your top files will show up here."
-        />
-
-        <MidiSection
-          title="Latest uploads"
-          subtitle="Fresh uploads added recently."
-          href="/midi"
-          linkLabel="Browse latest"
-          rows={(latestMidis ?? []) as MidiRow[]}
-          getAvg={getAvg}
-          emptyTitle="No uploads yet"
-          emptySubtitle="Be the first to upload a MIDI file."
-          ctaHref="/upload"
-          ctaLabel="Upload MIDI"
-        />
-
-        <MidiSection
-          title="Highest rated"
-          subtitle="Community favorites by average rating."
-          href="/midi"
-          linkLabel="View all"
-          rows={topRatedOrdered}
-          getAvg={getAvg}
-          emptyTitle="No rated files yet"
-          emptySubtitle="Once people start rating uploads, the top-rated files will show up here."
-        />
-
-        <MidiSection
-          title="With sheet music"
-          subtitle="MIDI files that include downloadable PDF sheet music."
-          href="/midi"
-          linkLabel="Explore PDFs"
-          rows={(pdfMidis ?? []) as MidiRow[]}
-          getAvg={getAvg}
-          emptyTitle="No PDFs uploaded yet"
-          emptySubtitle="Upload a sheet music PDF with your MIDI and it will appear here."
-          ctaHref="/upload"
-          ctaLabel="Upload MIDI + PDF"
-        />
-
-        <div className="hover-shine rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/20 md:p-8">
-          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div>
-              <h3 className="text-2xl font-black">Build your collection</h3>
-              <p className="mt-2 max-w-2xl text-gray-300">
-                Upload MIDI, attach optional sheet music, rate discoveries, and bookmark favorites to keep your creative reference library close.
-              </p>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-              <Link
-                href="/upload"
-                className="btn-glow tap inline-flex justify-center rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg transition hover:brightness-110"
-              >
-                Upload
-              </Link>
-              <Link
-                href="/bookmarks"
-                className="tap inline-flex justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
-              >
-                View bookmarks
-              </Link>
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 stagger-children">
+                <RewardMetric label="Rate" value="Stars" icon="⭐" />
+                <RewardMetric label="Collect" value="Bookmarks" icon="🔖" />
+                <RewardMetric label="Share" value="Uploads" icon="🚀" />
+              </div>
             </div>
           </div>
-        </div>
+        </AnimateIn>
+
+        <AnimateIn direction="up" delay={0.05}>
+          <MidiSection
+            title="Popular MIDI files"
+            subtitle="The most downloaded files right now."
+            href="/midi?sort=downloads"
+            linkLabel="View all"
+            rows={(popularMidis ?? []) as MidiRow[]}
+            getAvg={getAvg}
+            emptyTitle="No popular files yet"
+            emptySubtitle="Once people start downloading, your top files will show up here."
+          />
+        </AnimateIn>
+
+        <div className="divider-gradient" />
+
+        <AnimateIn direction="up" delay={0.05}>
+          <MidiSection
+            title="Latest uploads"
+            subtitle="Fresh uploads added recently."
+            href="/midi"
+            linkLabel="Browse latest"
+            rows={(latestMidis ?? []) as MidiRow[]}
+            getAvg={getAvg}
+            emptyTitle="No uploads yet"
+            emptySubtitle="Be the first to upload a MIDI file."
+            ctaHref="/upload"
+            ctaLabel="Upload MIDI"
+          />
+        </AnimateIn>
+
+        <div className="divider-gradient" />
+
+        <AnimateIn direction="up" delay={0.05}>
+          <MidiSection
+            title="Highest rated"
+            subtitle="Community favorites by average rating."
+            href="/midi"
+            linkLabel="View all"
+            rows={topRatedOrdered}
+            getAvg={getAvg}
+            emptyTitle="No rated files yet"
+            emptySubtitle="Once people start rating uploads, the top-rated files will show up here."
+          />
+        </AnimateIn>
+
+        <div className="divider-gradient" />
+
+        <AnimateIn direction="up" delay={0.05}>
+          <MidiSection
+            title="With sheet music"
+            subtitle="MIDI files that include downloadable PDF sheet music."
+            href="/midi"
+            linkLabel="Explore PDFs"
+            rows={(pdfMidis ?? []) as MidiRow[]}
+            getAvg={getAvg}
+            emptyTitle="No PDFs uploaded yet"
+            emptySubtitle="Upload a sheet music PDF with your MIDI and it will appear here."
+            ctaHref="/upload"
+            ctaLabel="Upload MIDI + PDF"
+          />
+        </AnimateIn>
+
+        <AnimateIn direction="up" delay={0.05}>
+          <div className="hover-shine border-glow relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/20 md:p-8">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(59,130,246,0.08),transparent_60%)]" />
+            <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+              <div>
+                <h3 className="text-2xl font-black">
+                  Build your{" "}
+                  <span className="text-gradient-brand">collection</span>
+                </h3>
+                <p className="mt-2 max-w-2xl text-gray-300">
+                  Upload MIDI, attach optional sheet music, rate discoveries, and bookmark favorites to keep your creative reference library close.
+                </p>
+              </div>
+
+              <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+                <Link
+                  href="/upload"
+                  className="btn-glow btn-press inline-flex justify-center rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg"
+                >
+                  Upload
+                </Link>
+                <Link
+                  href="/bookmarks"
+                  className="btn-press inline-flex justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
+                >
+                  View bookmarks
+                </Link>
+              </div>
+            </div>
+          </div>
+        </AnimateIn>
       </section>
     </main>
   );
@@ -453,12 +506,12 @@ function FeaturedGenres({ genres }: { genres: { genre: string; count: number }[]
   return (
     <div className="mt-7">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Start with a genre</p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2 stagger-children">
         {genres.map(({ genre, count }) => (
           <Link
             key={genre}
             href={`/midi?genre=${encodeURIComponent(genre)}`}
-            className="tap rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
+            className="btn-press rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]"
           >
             {genre} <span className="text-slate-500">{count}</span>
           </Link>
@@ -470,9 +523,9 @@ function FeaturedGenres({ genres }: { genres: { genre: string; count: number }[]
 
 function MiniFeature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+    <div className="card-glow rounded-2xl border border-white/10 bg-white/[0.045] p-4 hover:bg-white/[0.07]">
       <div className="flex items-center gap-2 text-sm font-bold text-white">
-        <span className="text-cyan-300">{icon}</span>
+        <span className="text-cyan-300 float">{icon}</span>
         {title}
       </div>
       <p className="mt-2 text-xs leading-5 text-slate-400">{text}</p>
@@ -485,22 +538,26 @@ function DiscoveryTile({
   label,
   value,
   href,
+  colorClass = "",
+  iconBg = "bg-blue-400/10 ring-blue-300/20",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   href: string;
+  colorClass?: string;
+  iconBg?: string;
 }) {
   return (
     <Link
       href={href}
-      className="hover-shine card-lift rounded-3xl border border-white/10 bg-white/[0.045] p-5"
+      className={`hover-shine card-lift group rounded-3xl border border-white/10 bg-white/[0.045] p-5 transition-all ${colorClass}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-400/10 text-cyan-200 ring-1 ring-blue-300/20">
+        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-110 ${iconBg}`}>
           {icon}
         </span>
-        <ArrowRight size={17} className="text-slate-500" />
+        <ArrowRight size={17} className="text-slate-500 transition-transform group-hover:translate-x-1" />
       </div>
       <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-black text-white">{value}</p>
@@ -508,18 +565,21 @@ function DiscoveryTile({
   );
 }
 
-function RewardMetric({ label, value }: { label: string; value: string }) {
+function RewardMetric({ label, value, icon }: { label: string; value: string; icon?: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-1 font-black text-white">{value}</p>
+    <div className="card-glow flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-4">
+      {icon && <span className="text-xl">{icon}</span>}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+        <p className="mt-0.5 font-black text-white">{value}</p>
+      </div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card-lift rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-left">
+    <div className="card-glow rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-left hover:bg-white/[0.08]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
       <p className="mt-2 text-lg font-bold text-white">{value}</p>
     </div>
@@ -538,19 +598,22 @@ function SectionHeader({
   linkLabel: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-        <p className="text-gray-400">{subtitle}</p>
-      </div>
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+          <p className="text-gray-400">{subtitle}</p>
+        </div>
 
-      <Link
-        href={href}
-        className="inline-flex items-center gap-1 self-start text-sm font-bold text-cyan-200 transition hover:text-white md:self-auto"
-      >
-        {linkLabel}
-        <ArrowRight size={15} />
-      </Link>
+        <Link
+          href={href}
+          className="group inline-flex items-center gap-1 self-start text-sm font-bold text-cyan-200 transition hover:text-white md:self-auto"
+        >
+          {linkLabel}
+          <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+        </Link>
+      </div>
+      <div className="divider-gradient" />
     </div>
   );
 }
@@ -568,13 +631,16 @@ function EmptyState({
 }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-8 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] text-2xl">
+        🎵
+      </div>
       <h3 className="text-lg font-bold">{title}</h3>
       <p className="mt-1 text-gray-400">{subtitle}</p>
 
       {ctaHref && ctaLabel ? (
         <Link
           href={ctaHref}
-          className="btn-glow mt-5 inline-flex rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg transition hover:brightness-110"
+          className="btn-glow btn-press mt-5 inline-flex rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg"
         >
           {ctaLabel}
         </Link>

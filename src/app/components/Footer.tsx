@@ -20,20 +20,19 @@ export function Footer() {
   };
 
   return (
-    <footer className="border-t border-white/10 bg-[radial-gradient(circle_at_top,#0f172a_0%,#020617_45%,#000_100%)] text-gray-300">
-      <div className="pointer-events-none relative">
-        <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-      </div>
+    <footer className="relative border-t border-white/[0.06] bg-[radial-gradient(circle_at_top,#0f172a_0%,#020617_45%,#000_100%)] text-gray-300">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-blue-500/[0.03] to-transparent pointer-events-none" />
 
       <div className="mx-auto max-w-7xl px-6 py-14">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-12">
           <div className="space-y-4 md:col-span-4">
-            <Link href="/" className="inline-flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_24px_rgba(96,165,250,0.18)]">
-                <Music2 size={20} className="text-cyan-300" />
+            <Link href="/" className="group inline-flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_24px_rgba(96,165,250,0.18)] transition group-hover:border-cyan-300/30 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.2)]">
+                <Music2 size={20} className="text-cyan-300 transition group-hover:scale-110" />
               </div>
               <div>
-                <p className="text-lg font-extrabold leading-none text-white">GiveMeMIDI</p>
+                <p className="text-lg font-extrabold leading-none bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">GiveMeMIDI</p>
                 <p className="mt-1 text-xs text-gray-400">MIDI + sheet music, made simple.</p>
               </div>
             </Link>
@@ -145,8 +144,8 @@ export function Footer() {
 function FooterLink({ href, label }: { href: string; label: string }) {
   return (
     <li>
-      <Link href={href} className="text-gray-400 transition hover:text-white">
-        {label}
+      <Link href={href} className="group flex items-center gap-1 text-gray-400 transition hover:text-white">
+        <span className="transition group-hover:translate-x-0.5">{label}</span>
       </Link>
     </li>
   );

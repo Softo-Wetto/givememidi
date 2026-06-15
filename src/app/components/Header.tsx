@@ -287,13 +287,17 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-300 border-b border-gray-800
+      className={`sticky top-0 z-50 transition-all duration-300
         ${
           scrolled
-            ? "bg-black/80 backdrop-blur-xl py-2 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
-            : "bg-black/60 backdrop-blur py-4"
+            ? "bg-black/85 backdrop-blur-2xl py-2 shadow-[0_4px_30px_rgba(0,0,0,0.5)] border-b border-white/[0.06]"
+            : "bg-black/40 backdrop-blur-xl py-4 border-b border-white/[0.04]"
         }`}
     >
+      {/* Gradient accent line at very top when scrolled */}
+      {scrolled && (
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
+      )}
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
@@ -302,8 +306,11 @@ export function Header() {
             className="flex items-center gap-2 group shrink-0"
             onClick={closeAll}
           >
-            <Music className="w-6 h-6 text-blue-400 group-hover:rotate-6 transition" />
-            <span className="text-xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="relative flex h-8 w-8 items-center justify-center">
+              <span className="absolute inset-0 rounded-xl bg-blue-500/20 blur-sm transition group-hover:bg-blue-400/35" />
+              <Music className="relative w-5 h-5 text-blue-400 transition group-hover:text-cyan-300 group-hover:rotate-6" />
+            </span>
+            <span className="text-xl font-extrabold bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent transition group-hover:from-blue-300 group-hover:to-cyan-300">
               GiveMeMIDI
             </span>
           </Link>

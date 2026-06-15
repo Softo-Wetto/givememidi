@@ -47,11 +47,12 @@ export function MidiCard({
 
   return (
     <motion.article
-      whileHover={{ y: -5 }}
-      transition={{ type: "spring", stiffness: 360, damping: 28 }}
-      className="group relative h-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-b from-white/[0.075] to-white/[0.04] shadow-xl shadow-black/20 backdrop-blur transition hover:border-blue-300/35 hover:bg-white/[0.09]"
+      whileHover={{ y: -6 }}
+      transition={{ type: "spring", stiffness: 380, damping: 26 }}
+      className="group relative h-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-b from-white/[0.075] to-white/[0.04] shadow-xl shadow-black/20 backdrop-blur transition-all duration-200 hover:border-blue-300/40 hover:bg-white/[0.10] hover:shadow-[0_20px_50px_rgba(0,0,0,0.4),0_0_30px_rgba(59,130,246,0.1)]"
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent opacity-0 transition group-hover:opacity-100" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
 
       <div className="absolute right-3 top-3 z-20" onClick={(e) => e.stopPropagation()}>
         <BookmarkButton midiId={id} />
