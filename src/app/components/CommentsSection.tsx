@@ -24,6 +24,7 @@ type CommentRow = {
   created_at: string;
   user_id: string;
   username: string;
+  avatar_url: string | null;
 };
 
 type CommentDbRow = {
@@ -36,6 +37,7 @@ type CommentDbRow = {
 type ProfileRow = {
   id: string;
   username: string | null;
+  avatar_url: string | null;
 };
 
 type SortMode = "newest" | "oldest";
@@ -131,11 +133,12 @@ export function CommentsSection({ midiId }: { midiId: string }) {
       const rows = (commentData ?? []) as CommentDbRow[];
       const ids = Array.from(new Set(rows.map((row) => row.user_id))).filter(Boolean);
       const usernameMap = new Map<string, string>();
+      const avatarMap = new Map<string, string | null>();
 
       if (ids.length > 0) {
         const { data: profileData, error: profileErr } = await pocketbase
           .from("profiles")
-          .select<ProfileRow>("id, username")
+          .select<ProfileRow>("id, username, avatar_url")
           .in("id", ids);
 
         if (profileErr) {
@@ -148,6 +151,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
         } else {
           (profileData ?? []).forEach((profile: ProfileRow) => {
             usernameMap.set(profile.id, (profile.username ?? "Anonymous").trim() || "Anonymous");
+            avatarMap.set(profile.id, profile.avatar_url ?? null);
           });
         }
       }
@@ -159,6 +163,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
           created_at: row.created_at,
           user_id: row.user_id,
           username: usernameMap.get(row.user_id) ?? "Anonymous",
+          avatar_url: avatarMap.get(row.user_id) ?? null,
         }))
       );
     } catch (error) {
@@ -226,6 +231,7 @@ export function CommentsSection({ midiId }: { midiId: string }) {
       created_at: new Date().toISOString(),
       user_id: userId,
       username: "You",
+      avatar_url: null,
     };
     setComments((current) => [optimistic, ...current]);
 
@@ -463,8 +469,16 @@ export function CommentsSection({ midiId }: { midiId: string }) {
                 className="card-lift rounded-3xl border border-white/10 bg-slate-950/55 p-4"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-400/10 text-sm font-black text-blue-100 ring-1 ring-blue-300/20">
-                    {comment.username === "Anonymous" ? <UserCircle2 size={20} /> : initials(comment.username)}
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-blue-400/10 bg-cover bg-center text-sm font-black text-blue-100 ring-1 ring-blue-300/20"
+                    style={comment.avatar_url ? { backgroundImage: `url(${comment.avatar_url})` } : undefined}
+                    aria-label={`${comment.username} avatar`}
+                  >
+                    {comment.avatar_url ? null : comment.username === "Anonymous" ? (
+                      <UserCircle2 size={20} />
+                    ) : (
+                      initials(comment.username)
+                    )}
                   </div>
 
                   <div className="min-w-0 flex-1">
