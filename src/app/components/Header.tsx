@@ -21,6 +21,7 @@ import {
   Sparkles,
   TrendingUp,
   Trophy,
+  ClipboardList,
 } from "lucide-react";
 import { User as UserIcon } from "lucide-react";
 import { UploadCloud } from "lucide-react";
@@ -28,6 +29,7 @@ import { pocketbase } from "../../lib/pocketbaseClient";
 import { useAuth } from "./AuthProvider";
 import { Users } from "lucide-react";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
 
 type ProfileRow = {
   username: string | null;
@@ -59,6 +61,7 @@ export function Header() {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const isAdmin = isGiveMeMidiAdmin(user?.email);
 
   const activePath = useMemo(() => pathname ?? "/", [pathname]);
 
@@ -607,6 +610,16 @@ export function Header() {
                         <Users size={16} className="text-emerald-300" />
                         Connections
                       </Link>
+                      {isAdmin ? (
+                        <Link
+                          href="/admin/imports"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-cyan-100 hover:bg-cyan-300/10 transition"
+                        >
+                          <ClipboardList size={16} className="text-cyan-300" />
+                          Import Inbox
+                        </Link>
+                      ) : null}
                     </div>
 
                     <div className="h-px bg-gray-700" />
@@ -737,6 +750,17 @@ export function Header() {
                 <Upload size={16} />
                 Upload MIDI
               </button>
+
+              {isAdmin ? (
+                <Link
+                  href="/admin/imports"
+                  onClick={closeAll}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 font-semibold text-cyan-100 transition hover:border-cyan-300/40"
+                >
+                  <ClipboardList size={16} className="text-cyan-300" />
+                  Import Inbox
+                </Link>
+              ) : null}
 
               {user ? (
                 <>

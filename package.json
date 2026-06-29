@@ -9,7 +9,8 @@
     "lint": "eslint",
     "pb:setup": "node scripts/setup-pocketbase.mjs",
     "pb:import": "node scripts/import-legacy-csv.mjs",
-    "pb:check": "node scripts/check-pocketbase-queries.mjs"
+    "pb:check": "node scripts/check-pocketbase-queries.mjs",
+    "import:midis": "node scripts/import-midi-batch.mjs"
   },
   "dependencies": {
     "@tonejs/midi": "^2.0.28",

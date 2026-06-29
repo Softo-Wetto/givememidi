@@ -32,6 +32,7 @@ const LEGACY_ID_COLLECTIONS = new Set([
   "follows",
   "bookmarks",
   "contact_messages",
+  "import_jobs",
 ]);
 
 const UPDATED_AT_COLLECTIONS = new Set([
@@ -39,6 +40,7 @@ const UPDATED_AT_COLLECTIONS = new Set([
   "profiles",
   "music_files",
   "midi_ratings",
+  "import_jobs",
 ]);
 
 function withCreateDefaults(collection: string, data: Record<string, unknown>) {

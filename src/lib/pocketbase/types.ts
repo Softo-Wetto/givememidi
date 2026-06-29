@@ -38,6 +38,12 @@ export type MusicFile = PocketBaseRecord & {
   description?: string | null;
   genre: string | null;
   bpm: number | null;
+  source_url?: string | null;
+  source_name?: string | null;
+  license?: string | null;
+  permission_note?: string | null;
+  import_status?: string | null;
+  file_hash?: string | null;
   midi_url: string | null;
   pdf_url: string | null;
   midi_file?: string | null;
@@ -46,6 +52,26 @@ export type MusicFile = PocketBaseRecord & {
   uploaded_by: string | null;
 };
 
+
+export type ImportJob = PocketBaseRecord & {
+  source_url: string | null;
+  source_type: string | null;
+  title: string | null;
+  composer: string | null;
+  description: string | null;
+  genre: string | null;
+  bpm: number | null;
+  license: string | null;
+  permission_note: string | null;
+  midi_path: string | null;
+  pdf_path: string | null;
+  status: "pending" | "ready" | "importing" | "imported" | "skipped" | "error" | string;
+  dedupe_key: string;
+  file_hash: string | null;
+  error_message: string | null;
+  music_file: string | null;
+  created_by: string | null;
+};
 export type XpEvent = RawPocketBaseRecord & {
   user_id: string;
   event_key: string;

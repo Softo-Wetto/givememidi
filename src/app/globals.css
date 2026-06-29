@@ -512,3 +512,24 @@ select {
     transform: none !important;
   }
 }
+
+.field {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(2, 6, 23, 0.72);
+  padding: 0.75rem 0.9rem;
+  color: #fff;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.field::placeholder {
+  color: rgb(71 85 105);
+}
+
+.field:focus {
+  border-color: rgba(34, 211, 238, 0.55);
+  background: rgba(2, 6, 23, 0.92);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.14);
+}

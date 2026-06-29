@@ -1,0 +1,2 @@
+title,composer,genre,bpm,description,midi_path,pdf_path,source_url,source_name,license,permission_note
+Example Public Domain Song,Example Composer,Classical,120,Short note shown on the MIDI page,imports/files/example.mid,imports/files/example.pdf,https://example.com/source,Example source,Public Domain,Confirmed public-domain or permission before import
