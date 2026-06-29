@@ -17,7 +17,6 @@ import {
 import {
   createRecord,
   getClientRecords,
-  getCurrentAuth,
   updateRecord,
 } from "@/lib/pocketbase/client";
 import type { ImportJob, RawPocketBaseRecord } from "@/lib/pocketbase/types";
@@ -141,7 +140,6 @@ export default function ImportInboxClient() {
   }, []);
 
   async function createJobs(urls: string[], sourceType = "score_url") {
-    const auth = getCurrentAuth();
     setWorking(true);
     setError("");
     setMessage("");
@@ -169,7 +167,6 @@ export default function ImportInboxClient() {
           permission_note: "Review license/permission before importing.",
           status: "pending",
           dedupe_key: key,
-          created_by: auth?.user.id || "",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });

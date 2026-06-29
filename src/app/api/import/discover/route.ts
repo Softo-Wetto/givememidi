@@ -28,6 +28,11 @@ export async function POST(request: NextRequest) {
   }
 
   const source = new URL(body.url);
+  const direct = normalizeScoreUrl(source.toString(), source);
+  if (source.pathname.includes("/scores/") && direct) {
+    return NextResponse.json({ links: [direct] });
+  }
+
   const response = await fetch(source.toString(), {
     headers: {
       "User-Agent": "GiveMeMIDI import discovery (+https://midi.softowetto.com)",
@@ -55,9 +60,6 @@ export async function POST(request: NextRequest) {
     const normalized = normalizeScoreUrl(match[0], source);
     if (normalized) links.add(normalized);
   }
-
-  const direct = normalizeScoreUrl(source.toString(), source);
-  if (source.pathname.includes("/scores/") && direct) links.add(direct);
 
   return NextResponse.json({ links: Array.from(links).slice(0, 250) });
 }
