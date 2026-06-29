@@ -14,12 +14,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import {
-  createRecord,
-  getClientRecords,
-  updateRecord,
-} from "@/lib/pocketbase/client";
-import type { ImportJob, RawPocketBaseRecord } from "@/lib/pocketbase/types";
+import type { ImportJob, PocketBaseList } from "@/lib/pocketbase/types";
 
 type ImportStatus = "pending" | "ready" | "importing" | "imported" | "skipped" | "error";
 
@@ -78,6 +73,26 @@ function statusClass(status: string) {
   if (status === "skipped") return "border-amber-300/25 bg-amber-300/10 text-amber-100";
   return "border-white/10 bg-white/[0.04] text-slate-300";
 }
+type ImportJobCreateResponse = {
+  item: ImportJob;
+  duplicate?: boolean;
+};
+
+async function importApi<T>(url: string, init?: RequestInit) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
+  const body = (await response.json().catch(() => null)) as T | { error?: string } | null;
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body && body.error ? body.error : `Import request failed (${response.status}).`;
+    throw new Error(message);
+  }
+  return body as T;
+}
 
 export default function ImportInboxClient() {
   const [sourceText, setSourceText] = useState("");
@@ -126,7 +141,7 @@ export default function ImportInboxClient() {
     setError("");
     try {
       const params = new URLSearchParams({ page: "1", perPage: "200", sort: "-created_at" });
-      const result = await getClientRecords<ImportJob & RawPocketBaseRecord>("import_jobs", params);
+      const result = await importApi<PocketBaseList<ImportJob>>(`/api/import/jobs?${params.toString()}`);
       setJobs(result.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load import jobs.");
@@ -156,7 +171,9 @@ export default function ImportInboxClient() {
           continue;
         }
 
-        await createRecord("import_jobs", {
+        const result = await importApi<ImportJobCreateResponse>("/api/import/jobs", {
+          method: "POST",
+          body: JSON.stringify({
           source_url: url,
           source_type: sourceType,
           title: titleFromUrl(url),
@@ -169,9 +186,11 @@ export default function ImportInboxClient() {
           dedupe_key: key,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          }),
         });
         existingKeys.add(key);
-        created += 1;
+        if (result.duplicate) skipped += 1;
+        else created += 1;
       }
 
       setSourceText("");
@@ -236,15 +255,18 @@ export default function ImportInboxClient() {
     setWorking(true);
     setError("");
     try {
-      await createRecord("import_jobs", {
-        ...draft,
-        bpm: draft.bpm ? Number(draft.bpm) : null,
-        source_url: draft.source_url.trim(),
-        status: "ready",
-        source_type: "manual_draft",
-        dedupe_key: key,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      await importApi<ImportJobCreateResponse>("/api/import/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          ...draft,
+          bpm: draft.bpm ? Number(draft.bpm) : null,
+          source_url: draft.source_url.trim(),
+          status: "ready",
+          source_type: "manual_draft",
+          dedupe_key: key,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
       });
       setDraft({
         source_url: "",
@@ -266,8 +288,11 @@ export default function ImportInboxClient() {
   }
 
   async function updateJob(job: ImportJob, patch: Partial<ImportJob>) {
-    await updateRecord("import_jobs", job.id, { ...patch, updated_at: new Date().toISOString() });
-    setJobs((current) => current.map((item) => (item.id === job.id ? { ...item, ...patch } : item)));
+    const result = await importApi<{ item: ImportJob }>(`/api/import/jobs/${job.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    });
+    setJobs((current) => current.map((item) => (item.id === job.id ? result.item : item)));
   }
 
   async function bulkStatus(status: ImportStatus) {
