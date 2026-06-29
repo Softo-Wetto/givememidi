@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
-import { getServerUser } from "@/lib/pocketbase/server";
+import { getServerAuth } from "@/lib/pocketbase/server";
 
 const SCORE_PATH_PATTERN = /href=["']([^"']*\/scores\/[0-9][^"']*)["']/gi;
 const ABSOLUTE_SCORE_PATTERN = /https?:\/\/musescore\.com\/[^\s"'<>]+\/scores\/[0-9][^\s"'<>]*/gi;
@@ -17,8 +17,8 @@ function normalizeScoreUrl(raw: string, source: URL) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getServerUser();
-  if (!isGiveMeMidiAdmin(user?.email)) {
+  const auth = await getServerAuth();
+  if (!isGiveMeMidiAdmin(auth?.user.email)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 

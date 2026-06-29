@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
-import { getServerUser } from "@/lib/pocketbase/server";
+import { getServerAuth } from "@/lib/pocketbase/server";
 import ImportInboxClient from "./ImportInboxClient";
 
 export const metadata = {
@@ -8,10 +8,10 @@ export const metadata = {
 };
 
 export default async function ImportInboxPage() {
-  const user = await getServerUser();
+  const auth = await getServerAuth();
 
-  if (!user) redirect("/login?redirect=/admin/imports");
-  if (!isGiveMeMidiAdmin(user.email)) redirect("/");
+  if (!auth?.user) redirect("/login?redirect=/admin/imports");
+  if (!isGiveMeMidiAdmin(auth.user.email)) redirect("/");
 
   return <ImportInboxClient />;
 }
