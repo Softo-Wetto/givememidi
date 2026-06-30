@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
-import { pbRequest } from "@/lib/pocketbase/shared";
+import { serializeAuthCookie } from "@/lib/pocketbase/auth-cookie";
+import { pbRequest, normalizeUser } from "@/lib/pocketbase/shared";
 import { getServerAuth } from "@/lib/pocketbase/server";
-import type { ImportJob, PocketBaseList } from "@/lib/pocketbase/types";
+import type { ImportJob, PocketBaseAuth, PocketBaseList, RawPocketBaseRecord } from "@/lib/pocketbase/types";
 
 function escapeFilterValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -17,13 +18,44 @@ function apiError(error: unknown, fallback = "Import request failed.") {
   return NextResponse.json({ error: message || fallback }, { status: status >= 400 && status < 500 ? status : 502 });
 }
 
+function withAuthCookie(response: NextResponse, cookie?: string) {
+  if (cookie) response.headers.append("Set-Cookie", cookie);
+  return response;
+}
+
+async function refreshAuth(auth: PocketBaseAuth) {
+  const refreshed = await pbRequest<{ token: string; record: RawPocketBaseRecord }>(
+    "/api/collections/users/auth-refresh",
+    { method: "POST", token: auth.token }
+  );
+
+  const nextAuth: PocketBaseAuth = {
+    token: refreshed.token,
+    user: normalizeUser(refreshed.record),
+  };
+
+  return {
+    auth: nextAuth,
+    cookie: serializeAuthCookie(nextAuth),
+  };
+}
+
 async function requireAdminAuth() {
-  const auth = await getServerAuth();
-  if (!auth?.user) return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
-  if (!isGiveMeMidiAdmin(auth.user.email)) {
-    return { error: NextResponse.json({ error: "Not authorized." }, { status: 403 }) };
+  const current = await getServerAuth();
+  if (!current?.user) return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
+
+  let refreshed: Awaited<ReturnType<typeof refreshAuth>>;
+  try {
+    refreshed = await refreshAuth(current);
+  } catch {
+    return { error: NextResponse.json({ error: "Your session expired. Please sign in again." }, { status: 401 }) };
   }
-  return { auth };
+
+  if (!isGiveMeMidiAdmin(refreshed.auth.user.email)) {
+    return { error: withAuthCookie(NextResponse.json({ error: "Not authorized." }, { status: 403 }), refreshed.cookie) };
+  }
+
+  return refreshed;
 }
 
 function normalizeJobPayload(body: Record<string, unknown>) {
@@ -50,8 +82,8 @@ function normalizeJobPayload(body: Record<string, unknown>) {
 export async function GET(request: NextRequest) {
   try {
     const guard = await requireAdminAuth();
-    if (guard.error) return guard.error;
-    const { auth } = guard;
+    if ("error" in guard) return guard.error;
+    const { auth, cookie } = guard;
 
     const params = new URL(request.url).searchParams;
     const query = new URLSearchParams({
@@ -66,7 +98,7 @@ export async function GET(request: NextRequest) {
       `/api/collections/import_jobs/records?${query.toString()}`,
       { token: auth.token }
     );
-    return NextResponse.json(list);
+    return withAuthCookie(NextResponse.json(list), cookie);
   } catch (error) {
     return apiError(error, "Unable to load import jobs.");
   }
@@ -75,15 +107,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const guard = await requireAdminAuth();
-    if (guard.error) return guard.error;
-    const { auth } = guard;
+    if ("error" in guard) return guard.error;
+    const { auth, cookie } = guard;
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!body) return NextResponse.json({ error: "Invalid import job payload." }, { status: 400 });
+    if (!body) return withAuthCookie(NextResponse.json({ error: "Invalid import job payload." }, { status: 400 }), cookie);
 
     const payload = normalizeJobPayload(body);
     if (!payload.dedupe_key) {
-      return NextResponse.json({ error: "A source URL or dedupe key is required." }, { status: 400 });
+      return withAuthCookie(NextResponse.json({ error: "A source URL or dedupe key is required." }, { status: 400 }), cookie);
     }
 
     const existing = await pbRequest<PocketBaseList<ImportJob>>(
@@ -91,7 +123,7 @@ export async function POST(request: NextRequest) {
       { token: auth.token }
     );
     if (existing.items[0]) {
-      return NextResponse.json({ item: existing.items[0], duplicate: true });
+      return withAuthCookie(NextResponse.json({ item: existing.items[0], duplicate: true }), cookie);
     }
 
     const item = await pbRequest<ImportJob>("/api/collections/import_jobs/records", {
@@ -99,7 +131,7 @@ export async function POST(request: NextRequest) {
       token: auth.token,
       body: JSON.stringify(payload),
     });
-    return NextResponse.json({ item, duplicate: false });
+    return withAuthCookie(NextResponse.json({ item, duplicate: false }), cookie);
   } catch (error) {
     return apiError(error, "Unable to create import job.");
   }
