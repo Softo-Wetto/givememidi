@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
-import { pbAdminRequest } from "@/lib/pocketbase/admin";
+import { pbRequest } from "@/lib/pocketbase/shared";
 import { getServerAuth } from "@/lib/pocketbase/server";
 import type { ImportJob, PocketBaseList } from "@/lib/pocketbase/types";
 
@@ -8,13 +8,13 @@ function escapeFilterValue(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-async function requireAdmin() {
+async function requireAdminAuth() {
   const auth = await getServerAuth();
-  if (!auth?.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!auth?.user) return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
   if (!isGiveMeMidiAdmin(auth.user.email)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    return { error: NextResponse.json({ error: "Not authorized." }, { status: 403 }) };
   }
-  return null;
+  return { auth };
 }
 
 function normalizeJobPayload(body: Record<string, unknown>) {
@@ -39,8 +39,9 @@ function normalizeJobPayload(body: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
-  const rejected = await requireAdmin();
-  if (rejected) return rejected;
+  const guard = await requireAdminAuth();
+  if (guard.error) return guard.error;
+  const { auth } = guard;
 
   const params = new URL(request.url).searchParams;
   const query = new URLSearchParams({
@@ -51,15 +52,17 @@ export async function GET(request: NextRequest) {
   const filter = params.get("filter");
   if (filter) query.set("filter", filter);
 
-  const list = await pbAdminRequest<PocketBaseList<ImportJob>>(
-    `/api/collections/import_jobs/records?${query.toString()}`
+  const list = await pbRequest<PocketBaseList<ImportJob>>(
+    `/api/collections/import_jobs/records?${query.toString()}`,
+    { token: auth.token }
   );
   return NextResponse.json(list);
 }
 
 export async function POST(request: NextRequest) {
-  const rejected = await requireAdmin();
-  if (rejected) return rejected;
+  const guard = await requireAdminAuth();
+  if (guard.error) return guard.error;
+  const { auth } = guard;
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid import job payload." }, { status: 400 });
@@ -69,15 +72,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A source URL or dedupe key is required." }, { status: 400 });
   }
 
-  const existing = await pbAdminRequest<PocketBaseList<ImportJob>>(
-    `/api/collections/import_jobs/records?page=1&perPage=1&filter=${encodeURIComponent(`dedupe_key = "${escapeFilterValue(payload.dedupe_key)}"`)}`
+  const existing = await pbRequest<PocketBaseList<ImportJob>>(
+    `/api/collections/import_jobs/records?page=1&perPage=1&filter=${encodeURIComponent(`dedupe_key = "${escapeFilterValue(payload.dedupe_key)}"`)}`,
+    { token: auth.token }
   );
   if (existing.items[0]) {
     return NextResponse.json({ item: existing.items[0], duplicate: true });
   }
 
-  const item = await pbAdminRequest<ImportJob>("/api/collections/import_jobs/records", {
+  const item = await pbRequest<ImportJob>("/api/collections/import_jobs/records", {
     method: "POST",
+    token: auth.token,
     body: JSON.stringify(payload),
   });
   return NextResponse.json({ item, duplicate: false });
