@@ -29,6 +29,9 @@ const pocketBaseUrl =
   "https://api-midi.softowetto.com";
 const superuserEmail = process.env.POCKETBASE_SUPERUSER_EMAIL;
 const superuserPassword = process.env.POCKETBASE_SUPERUSER_PASSWORD;
+const siteAdminEmail = process.env.GIVEMEMIDI_ADMIN_EMAIL || "nightmareasian@gmail.com";
+const siteAdminUserId = process.env.GIVEMEMIDI_ADMIN_USER_ID || "2sj31ce0l333rsi";
+const siteAdminRule = `(@request.auth.email = "${siteAdminEmail}" || @request.auth.id = "${siteAdminUserId}")`;
 
 if (!superuserEmail || !superuserPassword) {
   console.error("Missing POCKETBASE_SUPERUSER_EMAIL or POCKETBASE_SUPERUSER_PASSWORD.");
@@ -258,11 +261,11 @@ async function main() {
   await upsertCollection(token, {
     name: "import_jobs",
     type: "base",
-    listRule: '@request.auth.email = "nightmareasian@gmail.com"',
-    viewRule: '@request.auth.email = "nightmareasian@gmail.com"',
-    createRule: '@request.auth.email = "nightmareasian@gmail.com"',
-    updateRule: '@request.auth.email = "nightmareasian@gmail.com"',
-    deleteRule: '@request.auth.email = "nightmareasian@gmail.com"',
+    listRule: siteAdminRule,
+    viewRule: siteAdminRule,
+    createRule: siteAdminRule,
+    updateRule: siteAdminRule,
+    deleteRule: siteAdminRule,
     indexes: [
       "CREATE INDEX idx_import_jobs_status ON import_jobs (status)",
       "CREATE INDEX idx_import_jobs_source_url ON import_jobs (source_url)",
