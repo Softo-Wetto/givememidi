@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileInput,
   Loader2,
+  PlayCircle,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -100,6 +101,7 @@ export default function ImportInboxClient() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [workerRunning, setWorkerRunning] = useState(false);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -295,6 +297,24 @@ export default function ImportInboxClient() {
     setJobs((current) => current.map((item) => (item.id === job.id ? result.item : item)));
   }
 
+  async function runImportWorker() {
+    setWorkerRunning(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await importApi<{ run?: { id?: string }; error?: string }>("/api/import/run", {
+        method: "POST",
+        body: JSON.stringify({ limit: 25, status: "pending", types: "midi,pdf", import: true }),
+      });
+      setMessage(`Import worker started${result.run?.id ? ` (${result.run.id})` : ""}. Refresh the queue in a moment to see progress.`);
+      window.setTimeout(() => void loadJobs(), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to start import worker.");
+    } finally {
+      setWorkerRunning(false);
+    }
+  }
+
   async function bulkStatus(status: ImportStatus) {
     const targets = filteredJobs.filter((job) => job.status !== "imported");
     setWorking(true);
@@ -362,6 +382,10 @@ export default function ImportInboxClient() {
               </button>
               <button onClick={loadJobs} disabled={loading} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/[0.06] disabled:opacity-50">
                 <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+              </button>
+              <button onClick={runImportWorker} disabled={workerRunning || working} className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-black text-emerald-100 transition hover:border-emerald-200/50 hover:bg-emerald-300/15 disabled:opacity-50">
+                {workerRunning ? <Loader2 size={16} className="animate-spin" /> : <PlayCircle size={16} />}
+                Run import
               </button>
             </div>
           </div>

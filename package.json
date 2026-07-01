@@ -11,7 +11,8 @@
                     "pb:import":  "node scripts/import-legacy-csv.mjs",
                     "pb:check":  "node scripts/check-pocketbase-queries.mjs",
                     "import:midis":  "node scripts/import-midi-batch.mjs",
-                    "import:download":  "node scripts/download-librescore-jobs.mjs"
+                    "import:download":  "node scripts/download-librescore-jobs.mjs",
+                    "import:worker":  "node scripts/import-worker-server.mjs"
                 },
     "dependencies":  {
                          "@tonejs/midi":  "^2.0.28",
