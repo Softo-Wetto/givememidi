@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { ImportJob, PocketBaseList } from "@/lib/pocketbase/types";
+import BulkFileImportClient from "./BulkFileImportClient";
 
 type ImportStatus = "pending" | "ready" | "importing" | "imported" | "skipped" | "error";
 
@@ -79,6 +80,23 @@ type ImportJobCreateResponse = {
   duplicate?: boolean;
 };
 
+type WorkerRun = {
+  id?: string;
+  state?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  exitCode?: number | null;
+  logs?: string[];
+};
+
+type WorkerStatus = {
+  ok?: boolean;
+  running?: boolean;
+  currentRun?: WorkerRun | null;
+  lastRun?: WorkerRun | null;
+  run?: WorkerRun;
+};
+
 async function importApi<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
@@ -102,6 +120,7 @@ export default function ImportInboxClient() {
   const [working, setWorking] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [workerRunning, setWorkerRunning] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -297,17 +316,35 @@ export default function ImportInboxClient() {
     setJobs((current) => current.map((item) => (item.id === job.id ? result.item : item)));
   }
 
+  async function loadWorkerStatus() {
+    try {
+      const result = await importApi<WorkerStatus>("/api/import/run");
+      setWorkerStatus(result);
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
   async function runImportWorker() {
     setWorkerRunning(true);
     setError("");
     setMessage("");
     try {
-      const result = await importApi<{ run?: { id?: string }; error?: string }>("/api/import/run", {
+      const result = await importApi<WorkerStatus>("/api/import/run", {
         method: "POST",
-        body: JSON.stringify({ limit: 25, status: "pending", types: "midi,pdf", import: true }),
+        body: JSON.stringify({ limit: 25, status: "pending,ready", types: "midi,pdf", import: true }),
       });
-      setMessage(`Import worker started${result.run?.id ? ` (${result.run.id})` : ""}. Refresh the queue in a moment to see progress.`);
-      window.setTimeout(() => void loadJobs(), 2500);
+      setWorkerStatus(result);
+      setMessage(`Import worker started${result.run?.id ? ` (${result.run.id})` : ""}. Logs will update below.`);
+      window.setTimeout(() => {
+        void loadJobs();
+        void loadWorkerStatus();
+      }, 2500);
+      window.setTimeout(() => {
+        void loadJobs();
+        void loadWorkerStatus();
+      }, 8000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to start import worker.");
     } finally {
@@ -354,6 +391,8 @@ export default function ImportInboxClient() {
             </div>
           </div>
         </section>
+
+        <BulkFileImportClient />
 
         <section className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-xl">
@@ -406,9 +445,9 @@ export default function ImportInboxClient() {
             <button onClick={createManualDraft} disabled={working} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3 text-sm font-black text-white transition hover:from-blue-400 hover:to-indigo-400 disabled:opacity-50">Create draft</button>
           </div>
         </section>
-
         {message ? <Notice tone="success" text={message} /> : null}
         {error ? <Notice tone="error" text={error} /> : null}
+        <WorkerLogPanel status={workerStatus} onRefresh={loadWorkerStatus} />
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.045] shadow-xl">
           <div className="flex flex-col gap-4 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between">
@@ -536,5 +575,32 @@ function JobRow({ job, onUpdate }: { job: ImportJob; onUpdate: (job: ImportJob, 
         </div>
       ) : null}
     </article>
+  );
+}
+function WorkerLogPanel({ status, onRefresh }: { status: WorkerStatus | null; onRefresh: () => Promise<WorkerStatus | null> }) {
+  const run = status?.currentRun || status?.lastRun || status?.run || null;
+  if (!run) return null;
+  const state = run.state || (status?.running ? "running" : "unknown");
+  const logs = run.logs || [];
+  return (
+    <section className="rounded-3xl border border-white/10 bg-slate-950/75 p-5 shadow-xl">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-white">Worker activity</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Last run {run.id ? <span className="font-mono text-slate-300">{run.id}</span> : null} is <span className="font-bold text-cyan-200">{state}</span>
+            {typeof run.exitCode === "number" ? ` with exit code ${run.exitCode}` : ""}.
+          </p>
+        </div>
+        <button onClick={() => void onRefresh()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/[0.06]">
+          <RefreshCw size={16} /> Refresh worker logs
+        </button>
+      </div>
+      {logs.length ? (
+        <pre className="mt-4 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-black/60 p-4 text-xs leading-6 text-slate-200">{logs.join("\n")}</pre>
+      ) : (
+        <p className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-500">No worker log lines yet.</p>
+      )}
+    </section>
   );
 }

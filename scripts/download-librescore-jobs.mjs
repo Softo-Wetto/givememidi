@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { basename, extname, join, relative, resolve } from "node:path";
+import { basename, delimiter, dirname, extname, join, relative, resolve } from "node:path";
 
 function loadEnvFile(fileName) {
   const filePath = resolve(process.cwd(), fileName);
@@ -37,6 +37,7 @@ const commit = hasArg("--commit");
 const runImport = hasArg("--import");
 const limit = Number(getArg("--limit", "25"));
 const status = getArg("--status", "pending");
+const statuses = status.split(/[ ,]+/).map((value) => value.trim()).filter(Boolean);
 const outputRoot = resolve(process.cwd(), getArg("--output", "imports/downloads"));
 const typeArg = getArg("--types", "midi,pdf");
 const types = typeArg.split(/[ ,]+/).map((value) => value.trim()).filter(Boolean);
@@ -80,11 +81,14 @@ async function authenticate() {
 }
 
 async function readyJobs(token) {
+  const statusFilter = statuses.length
+    ? `(${statuses.map((value) => `status = "${escapeFilterValue(value)}"`).join(" || ")})`
+    : `status = "pending"`;
   const params = new URLSearchParams({
     page: "1",
     perPage: String(Math.max(1, limit)),
     sort: "created_at",
-    filter: `status = "${escapeFilterValue(status)}" && source_url != ""`,
+    filter: `${statusFilter} && source_url != ""`,
   });
   const result = await request(`/api/collections/import_jobs/records?${params.toString()}`, { token });
   return result.items || [];
@@ -124,8 +128,12 @@ function commandForDlLibrescore() {
 function runDownloader(input, outputDir) {
   const { command, prefix } = commandForDlLibrescore();
   const cliArgs = [...prefix, "-i", input, "-o", outputDir, ...types.flatMap((type) => ["-t", type])];
+  const env = {
+    ...process.env,
+    PATH: [dirname(process.execPath), process.env.PATH || ""].filter(Boolean).join(delimiter),
+  };
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, cliArgs, { stdio: "inherit", shell: false });
+    const child = spawn(command, cliArgs, { stdio: "inherit", shell: false, env });
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) resolvePromise();
@@ -159,7 +167,7 @@ async function main() {
   const token = await authenticate();
   const jobs = await readyJobs(token);
   if (!jobs.length) {
-    console.log(`No import jobs found with status=${status}.`);
+    console.log(`No import jobs found with status=${statuses.join(",") || "pending"}.`);
     return;
   }
 
