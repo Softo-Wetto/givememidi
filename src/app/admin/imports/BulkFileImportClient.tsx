@@ -339,7 +339,7 @@ export default function BulkFileImportClient() {
             <div>
               <h3 className="text-sm font-bold text-white">File review</h3>
               <p className="mt-0.5 text-xs text-slate-500">
-                {rows.length} rows · {stats.imported} published
+                {rows.length} rows Ã‚ /  {stats.imported} published
               </p>
             </div>
           </div>

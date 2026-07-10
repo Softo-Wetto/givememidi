@@ -395,7 +395,7 @@ export default function ImportQueuePanel({
           <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-xs text-slate-500">
               {filteredJobs.length} visible
-              {selectedIds.size ? ` · ${selectedIds.size} selected` : ""}
+              {selectedIds.size ? ` Ã‚ /  ${selectedIds.size} selected` : ""}
             </p>
             <div className="flex flex-wrap gap-2">
               <QueueAction label="Mark ready" onClick={() => void bulkStatus("ready")} disabled={Boolean(busyAction)} />
@@ -472,7 +472,7 @@ export default function ImportQueuePanel({
             <div className="mt-3 flex items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
                 {workerRun.id || "Latest run"}
-                {typeof workerRun.exitCode === "number" ? ` · exit ${workerRun.exitCode}` : ""}
+                {typeof workerRun.exitCode === "number" ? ` Ã‚ /  exit ${workerRun.exitCode}` : ""}
               </p>
               <button type="button" onClick={() => void loadWorkerStatus()} className="text-xs font-semibold text-cyan-200 hover:text-white">
                 Refresh logs
@@ -636,7 +636,7 @@ function QueueRow({
           </h3>
           <p className="mt-0.5 truncate text-xs text-slate-500">
             {job.composer || "Unknown composer"}
-            {job.genre ? ` · ${job.genre}` : ""}
+            {job.genre ? ` Ã‚ /  ${job.genre}` : ""}
           </p>
           {job.source_url ? (
             <a
