@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, FileArchive, FileMusic, FileText, Loader2, Plus, RefreshCw, Trash2, UploadCloud, Wand2, XCircle } from "lucide-react";
+import { CheckCircle2, FileMusic, FileText, Loader2, Plus, RefreshCw, Trash2, UploadCloud, Wand2, XCircle } from "lucide-react";
 import { createRecord, getCurrentAuth, updateRecord } from "@/lib/pocketbase/client";
 import { getPocketBaseFileUrl } from "@/lib/pocketbase/config";
 import type { MusicFile } from "@/lib/pocketbase/types";
@@ -249,93 +249,112 @@ export default function BulkFileImportClient() {
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-indigo-300/15 bg-white/[0.055] shadow-2xl shadow-black/30">
-      <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="relative border-b border-white/10 p-6 lg:border-b-0 lg:border-r lg:p-8">
-          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-indigo-500/10 to-transparent" />
-          <div className="relative">
-            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-300/20 bg-indigo-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-indigo-100">
-              <FileArchive size={15} /> Reliable bulk import
-            </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white md:text-4xl">Upload MIDI/PDF folders in one pass</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-400">
-              Drop a batch of files, review the auto-paired rows, then publish directly to the library. Matching is based on filenames, so files like <span className="font-mono text-slate-200">song.mid</span> and <span className="font-mono text-slate-200">song.pdf</span> become one upload.
-            </p>
-
-            <label
-              onDragEnter={() => setDragging(true)}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(false);
-                addFiles(event.dataTransfer.files);
-              }}
-              className={`mt-6 flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed p-8 text-center transition ${
-                dragging ? "border-cyan-200 bg-cyan-300/10" : "border-white/15 bg-slate-950/60 hover:border-cyan-300/40 hover:bg-cyan-300/5"
-              }`}
-            >
-              <UploadCloud className="text-cyan-200" size={34} />
-              <span className="mt-3 text-sm font-black text-white">Drop MIDI and PDF files here</span>
-              <span className="mt-1 text-xs text-slate-500">or click to select multiple files</span>
-              <input type="file" multiple accept=".mid,.midi,.pdf" className="hidden" onChange={(event) => event.target.files && addFiles(event.target.files)} />
-            </label>
-
-            <div className="mt-5 grid grid-cols-2 gap-3 text-center sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-5">
-              <Metric label="Publishable" value={stats.publishable} />
-              <Metric label="Paired" value={stats.paired} />
-              <Metric label="MIDI only" value={stats.missingPdf} />
-              <Metric label="Needs MIDI" value={stats.missingMidi} />
-              <Metric label="Imported" value={stats.imported} />
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Default composer</span>
-                <input value={globalComposer} onChange={(event) => setGlobalComposer(event.target.value)} className="field" placeholder="Apply to blank rows" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Default genre</span>
-                <select value={globalGenre} onChange={(event) => setGlobalGenre(event.target.value)} className="field">
-                  <option value="">Select genre</option>
-                  {GENRES.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button onClick={applyDefaults} disabled={!rows.length} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:border-cyan-300/40 disabled:opacity-40">
-                <Wand2 size={16} /> Apply defaults
-              </button>
-              <button onClick={resetImported} disabled={!stats.imported} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/[0.06] disabled:opacity-40">
-                <RefreshCw size={16} /> Clear imported
-              </button>
-            </div>
-          </div>
+    <section className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/65 shadow-xl shadow-black/20">
+      <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-300">
+            Local files
+          </p>
+          <h2 className="mt-1 text-xl font-bold text-white">Bulk MIDI and PDF upload</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Files with matching names are paired automatically before publishing.
+          </p>
         </div>
+        <button
+          onClick={publishSelected}
+          disabled={publishing || !stats.publishable}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-40"
+        >
+          {publishing ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+          Publish selected
+        </button>
+      </div>
 
-        <div className="p-5 lg:p-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-xl font-black text-white">Review queue</h3>
-              <p className="mt-1 text-sm text-slate-400">Edit titles, pair status, and metadata before publishing.</p>
-            </div>
-            <button onClick={publishSelected} disabled={publishing || !stats.publishable} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:opacity-40">
-              {publishing ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Publish selected
+      <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="border-b border-white/10 bg-white/[0.025] p-5 lg:border-b-0 lg:border-r">
+          <label
+            onDragEnter={() => setDragging(true)}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              addFiles(event.dataTransfer.files);
+            }}
+            className={[
+              "flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center transition",
+              dragging
+                ? "border-cyan-200 bg-cyan-300/10"
+                : "border-white/15 bg-black/25 hover:border-cyan-300/40 hover:bg-cyan-300/[0.04]",
+            ].join(" ")}
+          >
+            <UploadCloud className="text-cyan-200" size={30} />
+            <span className="mt-3 text-sm font-bold text-white">Drop MIDI and PDF files</span>
+            <span className="mt-1 text-xs text-slate-500">or select multiple files</span>
+            <input
+              type="file"
+              multiple
+              accept=".mid,.midi,.pdf"
+              className="hidden"
+              onChange={(event) => event.target.files && addFiles(event.target.files)}
+            />
+          </label>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Metric label="Publishable" value={stats.publishable} />
+            <Metric label="Paired" value={stats.paired} />
+            <Metric label="MIDI only" value={stats.missingPdf} />
+            <Metric label="Needs MIDI" value={stats.missingMidi} />
+          </div>
+
+          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Default composer</span>
+              <input value={globalComposer} onChange={(event) => setGlobalComposer(event.target.value)} className="field" placeholder="Apply to blank rows" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Default genre</span>
+              <select value={globalGenre} onChange={(event) => setGlobalGenre(event.target.value)} className="field">
+                <option value="">Select genre</option>
+                {GENRES.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-3 grid gap-2">
+            <button onClick={applyDefaults} disabled={!rows.length} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-300 transition hover:border-cyan-300/35 hover:text-white disabled:opacity-35">
+              <Wand2 size={15} /> Apply defaults
             </button>
+            <button onClick={resetImported} disabled={!stats.imported} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-semibold text-slate-400 transition hover:bg-white/[0.05] hover:text-white disabled:opacity-35">
+              <RefreshCw size={15} /> Clear imported rows
+            </button>
+          </div>
+        </aside>
+
+        <div className="min-w-0 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-white">File review</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {rows.length} rows · {stats.imported} published
+              </p>
+            </div>
           </div>
 
           {message ? <Notice tone="success" text={message} /> : null}
           {error ? <Notice tone="error" text={error} /> : null}
 
-          <div className="mt-4 max-h-[620px] space-y-3 overflow-auto pr-1">
+          <div className="mt-4 max-h-[660px] space-y-3 overflow-auto pr-1">
             {rows.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-8 text-center text-sm text-slate-500">
-                No files selected yet. Add `.mid`, `.midi`, and `.pdf` files to start pairing.
+              <div className="rounded-lg border border-dashed border-white/10 px-5 py-12 text-center">
+                <FileMusic size={23} className="mx-auto text-slate-600" />
+                <p className="mt-3 text-sm font-semibold text-slate-300">No files selected</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Add .mid, .midi, and .pdf files to start pairing.
+                </p>
               </div>
             ) : (
               rows.map((row) => (
@@ -351,7 +370,7 @@ export default function BulkFileImportClient() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/55 px-3 py-3">
+    <div className="rounded-lg border border-white/10 bg-slate-950/55 px-3 py-3">
       <p className="text-xl font-black text-white">{value}</p>
       <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
     </div>
@@ -361,7 +380,7 @@ function Metric({ label, value }: { label: string; value: number }) {
 function Notice({ tone, text }: { tone: "success" | "error"; text: string }) {
   const Icon = tone === "success" ? CheckCircle2 : XCircle;
   const cls = tone === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-red-300/20 bg-red-300/10 text-red-100";
-  return <div className={`mt-4 flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${cls}`}><Icon size={16} />{text}</div>;
+  return <div className={`mt-4 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold ${cls}`}><Icon size={16} />{text}</div>;
 }
 
 function BulkRowCard({ row, onUpdate, onRemove }: { row: BulkRow; onUpdate: (id: string, patch: Partial<BulkRow>) => void; onRemove: (id: string) => void }) {
@@ -375,7 +394,7 @@ function BulkRowCard({ row, onUpdate, onRemove }: { row: BulkRow; onUpdate: (id:
         : "border-amber-300/20 bg-amber-300/10 text-amber-100";
 
   return (
-    <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 transition hover:border-white/20">
+    <article className="rounded-lg border border-white/10 bg-slate-950/60 p-4 transition hover:border-white/20">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -386,7 +405,7 @@ function BulkRowCard({ row, onUpdate, onRemove }: { row: BulkRow; onUpdate: (id:
           </div>
           <p className="mt-2 text-xs text-slate-500">{row.message}</p>
         </div>
-        <button type="button" onClick={() => onRemove(row.id)} disabled={isLocked} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-red-300/40 hover:text-red-100 disabled:opacity-40">
+        <button type="button" onClick={() => onRemove(row.id)} disabled={isLocked} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-red-300/40 hover:text-red-100 disabled:opacity-40">
           <Trash2 size={14} /> Remove
         </button>
       </div>

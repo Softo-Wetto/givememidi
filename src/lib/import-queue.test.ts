@@ -5,6 +5,7 @@ import {
   filterImportJobs,
   reconcileDeletedJobs,
   selectedVisibleIds,
+  toggleVisibleSelection,
   validateImportJobIds,
 } from "./import-queue.ts";
 
@@ -104,5 +105,22 @@ test("applies the deletion limit after deduplicating IDs", () => {
   assert.deepEqual(
     validateImportJobIds({ ids: Array.from({ length: 201 }, () => "aaaaaaaaaaaaaaa") }),
     { ids: ["aaaaaaaaaaaaaaa"] }
+  );
+});
+
+test("toggles only visible queue selections", () => {
+  const selected = new Set(["ccccccccccccccc"]);
+
+  assert.deepEqual(
+    toggleVisibleSelection(selected, ["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb"]),
+    new Set(["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb", "ccccccccccccccc"])
+  );
+
+  assert.deepEqual(
+    toggleVisibleSelection(
+      new Set(["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb", "ccccccccccccccc"]),
+      ["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb"]
+    ),
+    new Set(["ccccccccccccccc"])
   );
 });

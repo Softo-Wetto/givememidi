@@ -111,3 +111,19 @@ export function reconcileDeletedJobs<T extends ImportQueueJob>(
     ),
   };
 }
+
+export function toggleVisibleSelection(
+  selectedIds: ReadonlySet<string>,
+  visibleIds: readonly string[]
+): Set<string> {
+  const next = new Set(selectedIds);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => next.has(id));
+
+  visibleIds.forEach((id) => {
+    if (allVisibleSelected) next.delete(id);
+    else next.add(id);
+  });
+
+  return next;
+}
