@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
+import { validateImportJobIds } from "@/lib/import-queue";
 import { serializeAuthCookie } from "@/lib/pocketbase/auth-cookie";
 import { pbRequest, normalizeUser } from "@/lib/pocketbase/shared";
 import { getServerAuth } from "@/lib/pocketbase/server";
@@ -134,5 +135,69 @@ export async function POST(request: NextRequest) {
     return withAuthCookie(NextResponse.json({ item, duplicate: false }), cookie);
   } catch (error) {
     return apiError(error, "Unable to create import job.");
+  }
+}
+export async function DELETE(request: NextRequest) {
+  try {
+    const guard = await requireAdminAuth();
+    if ("error" in guard) return guard.error;
+    const { auth, cookie } = guard;
+
+    const body = await request.json().catch(() => null);
+    const validation = validateImportJobIds(body, 200);
+    if ("error" in validation) {
+      return withAuthCookie(
+        NextResponse.json({ error: validation.error }, { status: 400 }),
+        cookie
+      );
+    }
+
+    const results = await Promise.allSettled(
+      validation.ids.map(async (id) => {
+        await pbRequest<void>(`/api/collections/import_jobs/records/${id}`, {
+          method: "DELETE",
+          token: auth.token,
+        });
+        return id;
+      })
+    );
+
+    const deletedIds: string[] = [];
+    const failures: Array<{ id: string; error: string }> = [];
+
+    results.forEach((result, index) => {
+      const id = validation.ids[index];
+      if (result.status === "fulfilled") {
+        deletedIds.push(id);
+        return;
+      }
+
+      failures.push({
+        id,
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : "Unable to delete this import job.",
+      });
+    });
+
+    if (deletedIds.length === 0) {
+      console.error("Bulk import job deletion failed:", failures);
+      return withAuthCookie(
+        NextResponse.json(
+          {
+            error: "Unable to delete the selected import jobs.",
+            deletedIds,
+            failures,
+          },
+          { status: 502 }
+        ),
+        cookie
+      );
+    }
+
+    return withAuthCookie(NextResponse.json({ deletedIds, failures }), cookie);
+  } catch (error) {
+    return apiError(error, "Unable to delete import jobs.");
   }
 }

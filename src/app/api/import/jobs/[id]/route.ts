@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
+import { validateImportJobIds } from "@/lib/import-queue";
 import { serializeAuthCookie } from "@/lib/pocketbase/auth-cookie";
 import { pbRequest, normalizeUser } from "@/lib/pocketbase/shared";
 import { getServerAuth } from "@/lib/pocketbase/server";
@@ -72,5 +73,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return withAuthCookie(NextResponse.json({ item }), cookie);
   } catch (error) {
     return apiError(error, "Unable to update import job.");
+  }
+}
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const guard = await requireAdminAuth();
+    if ("error" in guard) return guard.error;
+    const { auth, cookie } = guard;
+
+    const { id } = await params;
+    const validation = validateImportJobIds({ ids: [id] }, 1);
+    if ("error" in validation) {
+      return withAuthCookie(
+        NextResponse.json({ error: validation.error }, { status: 400 }),
+        cookie
+      );
+    }
+
+    await pbRequest<void>(`/api/collections/import_jobs/records/${validation.ids[0]}`, {
+      method: "DELETE",
+      token: auth.token,
+    });
+
+    return withAuthCookie(
+      NextResponse.json({ deletedId: validation.ids[0] }),
+      cookie
+    );
+  } catch (error) {
+    return apiError(error, "Unable to delete import job.");
   }
 }

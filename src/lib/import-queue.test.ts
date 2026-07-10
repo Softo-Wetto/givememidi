@@ -80,3 +80,29 @@ test("keeps failed deletions visible and selected", () => {
   assert.deepEqual(result.jobs, jobs.filter((job) => job.id !== "aaaaaaaaaaaaaaa"));
   assert.deepEqual(result.selectedIds, new Set(["bbbbbbbbbbbbbbb"]));
 });
+
+test("rejects malformed import job IDs", () => {
+  assert.deepEqual(validateImportJobIds({ ids: ["bad id"] }), {
+    error: "One or more import job IDs are invalid.",
+  });
+  assert.deepEqual(validateImportJobIds({ ids: "aaaaaaaaaaaaaaa" }), {
+    error: "Import job IDs must be provided as an array.",
+  });
+});
+
+test("rejects deletion batches larger than 200 records", () => {
+  const ids = Array.from({ length: 201 }, (_, index) =>
+    index.toString(36).padStart(15, "0").slice(-15)
+  );
+
+  assert.deepEqual(validateImportJobIds({ ids }), {
+    error: "You can delete at most 200 import jobs at once.",
+  });
+});
+
+test("applies the deletion limit after deduplicating IDs", () => {
+  assert.deepEqual(
+    validateImportJobIds({ ids: Array.from({ length: 201 }, () => "aaaaaaaaaaaaaaa") }),
+    { ids: ["aaaaaaaaaaaaaaa"] }
+  );
+});

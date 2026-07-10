@@ -73,9 +73,6 @@ export function validateImportJobIds(
     return { error: "Import job IDs must be provided as an array." };
   }
 
-  if (idsValue.length > max) {
-    return { error: `You can delete at most ${max} import jobs at once.` };
-  }
 
   const ids = Array.from(
     new Set(
@@ -85,6 +82,9 @@ export function validateImportJobIds(
 
   if (ids.length === 0 || ids.every((id) => id.length === 0)) {
     return { error: "Select at least one import job." };
+  }
+  if (ids.length > max) {
+    return { error: `You can delete at most ${max} import jobs at once.` };
   }
 
   if (ids.some((id) => !RECORD_ID_PATTERN.test(id))) {
