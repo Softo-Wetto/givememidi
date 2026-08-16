@@ -1,62 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-const NOTES = ["♩", "♪", "♫", "♬", "𝄞", "𝄢", "♩", "♪"];
-
-type NoteItem = {
-  id: number;
-  symbol: string;
-  left: number;
-  size: number;
-  dur: number;
-  delay: number;
-  color: string;
-};
-
-const COLORS = [
+const NOTE_SYMBOLS = ["\u2669", "\u266A", "\u266B", "\u266C", "\uD834\uDD1E", "\u266A"];
+const NOTE_COLORS = [
   "rgba(96,165,250,0.18)",
   "rgba(34,211,238,0.15)",
   "rgba(167,139,250,0.14)",
-  "rgba(96,165,250,0.12)",
   "rgba(52,211,153,0.12)",
 ];
 
+const notes = Array.from({ length: 14 }, (_, index) => ({
+  id: index,
+  symbol: NOTE_SYMBOLS[index % NOTE_SYMBOLS.length],
+  left: 3 + (index * 6.8) % 94,
+  size: 13 + (index % 5) * 5,
+  duration: 7 + (index % 6) * 1.8,
+  delay: (index % 8) * 1.1,
+  color: NOTE_COLORS[index % NOTE_COLORS.length],
+}));
+
 export function FloatingNotes() {
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-
-  useEffect(() => {
-    const items: NoteItem[] = Array.from({ length: 14 }, (_, i) => ({
-      id: i,
-      symbol: NOTES[i % NOTES.length],
-      left: 3 + (i * 6.8) % 94,
-      size: 13 + (i % 5) * 5,
-      dur: 7 + (i % 6) * 1.8,
-      delay: (i % 8) * 1.1,
-      color: COLORS[i % COLORS.length],
-    }));
-    setNotes(items);
-  }, []);
-
   return (
-    <div
-      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
-      aria-hidden="true"
-    >
-      {notes.map((n) => (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden select-none" aria-hidden="true">
+      {notes.map((note) => (
         <span
-          key={n.id}
+          key={note.id}
           className="music-note"
           style={{
-            left: `${n.left}%`,
+            left: `${note.left}%`,
             bottom: "-10%",
-            fontSize: `${n.size}px`,
-            color: n.color,
-            "--dur": `${n.dur}s`,
-            "--delay": `${n.delay}s`,
+            fontSize: `${note.size}px`,
+            color: note.color,
+            "--dur": `${note.duration}s`,
+            "--delay": `${note.delay}s`,
           } as React.CSSProperties}
         >
-          {n.symbol}
+          {note.symbol}
         </span>
       ))}
     </div>

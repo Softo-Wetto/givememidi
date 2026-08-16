@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { artworkVariant, formatMetric } from "./editorial-ui.ts";
+import { artworkVariant, formatMetric, isNavActive } from "./editorial-ui.ts";
 
 test("artwork variants are deterministic", () => {
   assert.equal(artworkVariant("same-id"), artworkVariant("same-id"));
@@ -17,4 +17,11 @@ test("metrics stay exact below one thousand", () => {
 test("metrics use compact thousands and millions", () => {
   assert.equal(formatMetric(1_250), "1.3K");
   assert.equal(formatMetric(1_250_000), "1.3M");
+});
+
+test("navigation links stay active on their nested routes", () => {
+  assert.equal(isNavActive("/midi/record-id", "/midi"), true);
+  assert.equal(isNavActive("/creators", "/midi"), false);
+  assert.equal(isNavActive("/", "/"), true);
+  assert.equal(isNavActive("/midi", "/"), false);
 });

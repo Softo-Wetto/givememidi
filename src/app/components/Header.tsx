@@ -1,842 +1,122 @@
 "use client";
 
+import { Award, Bookmark, ClipboardList, LogIn, LogOut, Menu, Music2, Upload, UploadCloud, UserRound, Users, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Award,
-  Compass,
-  Menu,
-  X,
-  Search,
-  Upload,
-  Music,
-  LogIn,
-  Bookmark,
-  LogOut,
-  ChevronDown,
-  Info,
-  Loader2,
-  Mail,
-  Sparkles,
-  TrendingUp,
-  Trophy,
-  ClipboardList,
-} from "lucide-react";
-import { User as UserIcon } from "lucide-react";
-import { UploadCloud } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
+import { isNavActive } from "@/lib/editorial-ui";
 import { pocketbase } from "../../lib/pocketbaseClient";
 import { useAuth } from "./AuthProvider";
-import { Users } from "lucide-react";
-import { ProfileAvatar } from "./ProfileAvatar";
-import { isGiveMeMidiAdmin } from "@/lib/givememidi-admin";
+import { HeaderAccount } from "./HeaderAccount";
+import { HeaderSearch } from "./HeaderSearch";
 
-type ProfileRow = {
-  username: string | null;
-  avatar_url: string | null;
-};
-
-type SearchSuggestion = {
-  id: string;
-  title: string;
-  composer: string | null;
-  genre: string | null;
-};
+const navigation = [
+  { href: "/", label: "Home" },
+  { href: "/midi", label: "Library" },
+  { href: "/creators", label: "Creators" },
+  { href: "/awards", label: "Awards" },
+];
 
 export function Header() {
+  const pathname = usePathname() || "/";
   const router = useRouter();
-  const pathname = usePathname();
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [searchSuggesting, setSearchSuggesting] = useState(false);
-  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
-  const [scrolled, setScrolled] = useState(false);
+  const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-
-  const { user, loading: authLoading } = useAuth();
-  const [username, setUsername] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [discoverOpen, setDiscoverOpen] = useState(false);
   const isAdmin = isGiveMeMidiAdmin(user?.email);
 
-  const activePath = useMemo(() => pathname ?? "/", [pathname]);
-
-  const closeAll = () => {
-    setMobileOpen(false);
-    setDiscoverOpen(false);
-    setProfileOpen(false);
-  };
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    if (!profileOpen && !discoverOpen) return;
-
-    const close = () => {
-      setProfileOpen(false);
-      setDiscoverOpen(false);
-    };
-
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [profileOpen, discoverOpen]);
-
-  // Scroll animation
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
-      event.preventDefault();
-      searchInputRef.current?.focus();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    const q = searchQuery.trim();
-    let cancelled = false;
-
-    const timer = window.setTimeout(async () => {
-      if (q.length < 2) {
-        setSearchSuggestions([]);
-        setSearchSuggesting(false);
-        return;
-      }
-
-      setSearchSuggesting(true);
-
-      const safeQuery = q.replace(/[,"%]/g, " ").replace(/\s+/g, " ").trim();
-      if (!safeQuery) {
-        setSearchSuggestions([]);
-        setSearchSuggesting(false);
-        return;
-      }
-
-      const { data, error } = await pocketbase
-        .from("music_files")
-        .select<SearchSuggestion>("id,title,composer,genre")
-        .or(`title.ilike.%${safeQuery}%,composer.ilike.%${safeQuery}%,genre.ilike.%${safeQuery}%`)
-        .limit(6);
-
-      if (cancelled) return;
-      if (error) {
-        console.error("Search suggestions error:", error);
-        setSearchSuggestions([]);
-      } else {
-        setSearchSuggestions((data ?? []) as SearchSuggestion[]);
-      }
-      setSearchSuggesting(false);
-    }, q.length < 2 ? 0 : 180);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [searchQuery]);
-
-  // Load username
-  useEffect(() => {
-    let alive = true;
-
-    const loadUsername = async () => {
-      if (!user) {
-        setUsername(null);
-        setAvatarUrl(null);
-        return;
-      }
-
-      const { data: prof, error } = await pocketbase
-        .from("profiles")
-        .select("username, avatar_url")
-        .eq("id", user.id)
-        .maybeSingle<ProfileRow>();
-
-      if (!alive) return;
-
-      if (error) {
-        console.error("Header profile fetch error:", error);
-        setUsername(null);
-        setAvatarUrl(null);
-        return;
-      }
-
-      setUsername(prof?.username ?? null);
-      setAvatarUrl(prof?.avatar_url ?? null);
-    };
-
-    loadUsername();
-
-    return () => {
-      alive = false;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    const handleProfileUpdate = (event: Event) => {
-      const detail = (event as CustomEvent<{ username?: string; avatarUrl?: string | null }>).detail;
-      if (!detail) return;
-      if (typeof detail.username === "string") setUsername(detail.username);
-      if ("avatarUrl" in detail) setAvatarUrl(detail.avatarUrl ?? null);
-    };
-
-    window.addEventListener("givememidi:profile-updated", handleProfileUpdate);
-    return () => window.removeEventListener("givememidi:profile-updated", handleProfileUpdate);
-  }, []);
-
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
-
-    router.push(`/midi?search=${encodeURIComponent(q)}`);
-    setSearchQuery("");
-    setSearchFocused(false);
-    setMobileOpen(false);
-  };
-
-  const openSuggestion = (suggestion: SearchSuggestion) => {
-    router.push(`/midi/${suggestion.id}`);
-    setSearchQuery("");
-    setSearchFocused(false);
-    setMobileOpen(false);
-  };
-
+  const close = () => setMobileOpen(false);
   const goUpload = () => {
-    closeAll();
-
-    if (authLoading) return;
-
+    close();
+    if (loading) return;
     if (user) {
       router.push("/upload");
       return;
     }
 
-    const next = pathname && pathname !== "/login" ? pathname : "/upload";
+    const next = pathname !== "/login" ? pathname : "/upload";
     router.push(`/login?redirect=${encodeURIComponent(next)}`);
   };
 
-  const searchDropdown =
-    searchFocused && searchQuery.trim().length >= 2 ? (
-      <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
-        <button
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            const q = searchQuery.trim();
-            if (!q) return;
-            router.push(`/midi?search=${encodeURIComponent(q)}`);
-            setSearchQuery("");
-            setSearchFocused(false);
-            setMobileOpen(false);
-          }}
-          className="flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left text-sm text-slate-200 transition hover:bg-white/[0.06]"
-        >
-          <span>
-            Search all for <span className="font-semibold text-white">{searchQuery.trim()}</span>
-          </span>
-          <Search size={15} className="text-cyan-300" />
-        </button>
-
-        {searchSuggesting ? (
-          <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-400">
-            <Loader2 size={15} className="animate-spin" />
-            Finding matches...
-          </div>
-        ) : searchSuggestions.length > 0 ? (
-          <div className="py-1">
-            {searchSuggestions.map((suggestion) => (
-              <button
-                key={suggestion.id}
-                type="button"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  openSuggestion(suggestion);
-                }}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.06]"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-300/10 text-cyan-200 ring-1 ring-cyan-300/15">
-                  <Music size={16} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-white">
-                    {suggestion.title}
-                  </span>
-                  <span className="block truncate text-xs text-slate-400">
-                    {suggestion.composer || "Unknown composer"}
-                    {suggestion.genre ? ` • ${suggestion.genre}` : ""}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="px-4 py-3 text-sm text-slate-500">No quick matches yet.</div>
-        )}
-      </div>
-    ) : null;
-
   return (
-    <header
-      className={`sticky top-0 z-50 transition-all duration-300
-        ${
-          scrolled
-            ? "bg-black/85 backdrop-blur-2xl py-2 shadow-[0_4px_30px_rgba(0,0,0,0.5)] border-b border-white/[0.06]"
-            : "bg-black/40 backdrop-blur-xl py-4 border-b border-white/[0.04]"
-        }`}
-    >
-      {/* Gradient accent line at very top when scrolled */}
-      {scrolled && (
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
-      )}
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between gap-4">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center gap-2 group shrink-0"
-            onClick={closeAll}
-          >
-            <span className="relative flex h-8 w-8 items-center justify-center">
-              <span className="absolute inset-0 rounded-xl bg-blue-500/20 blur-sm transition group-hover:bg-blue-400/35" />
-              <Music className="relative w-5 h-5 text-blue-400 transition group-hover:text-cyan-300 group-hover:rotate-6" />
-            </span>
-            <span className="text-xl font-extrabold bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent transition group-hover:from-blue-300 group-hover:to-cyan-300">
-              GiveMeMIDI
-            </span>
-          </Link>
+    <header className="gmm-site-header">
+      <div className="gmm-header-inner">
+        <Link href="/" className="gmm-wordmark" onClick={close} aria-label="GiveMeMIDI home">
+          <span className="gmm-wordmark-icon"><Music2 size={20} /></span>
+          <span>GiveMe<span>MIDI</span></span>
+        </Link>
 
-          {/* Search (desktop) */}
-          <form
-            onSubmit={handleSearch}
-            className="relative hidden md:flex flex-1 max-w-md items-center
-              bg-gray-800/70 rounded-2xl overflow-visible border border-gray-700
-              focus-within:ring-2 focus-within:ring-blue-400/60 transition"
-          >
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search MIDI, composer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-              className="w-full px-4 py-2.5 bg-transparent text-white placeholder-gray-400 focus:outline-none"
-            />
-            {!searchQuery ? (
-              <kbd className="mr-1 hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 lg:inline">
-                /
-              </kbd>
-            ) : null}
-            <button
-              type="submit"
-              className="px-4 text-gray-300 hover:text-white transition"
-              aria-label="Search"
-            >
-              <Search size={18} />
-            </button>
-            {searchDropdown}
-          </form>
+        <nav className="gmm-desktop-nav" aria-label="Primary navigation">
+          {navigation.map((item) => (
+            <Link key={item.href} href={item.href} data-active={isNavActive(pathname, item.href)}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-3 relative">
-            {/* Discover + Upload group (keeps them right beside each other) */}
-            <div className="relative flex items-center gap-2">
-              {/* Discover */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDiscoverOpen((v) => !v);
-                    setProfileOpen(false);
-                  }}
-                  className={`group inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition
-                    ${
-                      discoverOpen
-                        ? "border border-cyan-300/40 bg-cyan-300/10 text-white shadow-[0_0_24px_rgba(34,211,238,0.14)]"
-                        : "border border-white/10 bg-white/5 text-gray-200 hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white"
-                    }`}
-                  aria-haspopup="menu"
-                  aria-expanded={discoverOpen}
-                >
-                  <Compass size={16} className="text-cyan-300 transition group-hover:rotate-12" />
-                  <span>Discover</span>
-                  <ChevronDown
-                    size={16}
-                    className={`transition-transform ${
-                      discoverOpen
-                        ? "rotate-180 text-white"
-                        : "text-gray-400 group-hover:text-white"
-                    }`}
-                  />
-                </button>
+        <div className="gmm-header-search-wrap"><HeaderSearch /></div>
 
-                {discoverOpen && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute right-0 mt-3 w-[25rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl animate-in fade-in zoom-in-95"
-                    role="menu"
-                  >
-                    <div className="relative overflow-hidden border-b border-white/10 px-5 py-4">
-                      <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl" />
-                      <div className="relative flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200/80">
-                            Library
-                          </p>
-                          <p className="mt-1 text-base font-bold text-white">Find your next MIDI</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-400">
-                            Browse scores, creators, community picks, and support links.
-                          </p>
-                        </div>
-                        <span className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-cyan-200">
-                          <Sparkles size={18} />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 p-2">
-                      <Link
-                        href="/midi"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
-                        role="menuitem"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-400/10 text-blue-200 ring-1 ring-blue-300/15">
-                          <Music size={17} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-white">All MIDI</span>
-                          <span className="block truncate text-xs text-slate-400">
-                            Search the full library by title, composer, or genre.
-                          </span>
-                        </span>
-                      </Link>
-
-                      <Link
-                        href="/creators"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
-                        role="menuitem"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-300/10 text-amber-200 ring-1 ring-amber-200/15">
-                          <Award size={17} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-white">Top Creators</span>
-                          <span className="block truncate text-xs text-slate-400">
-                            See points, upload streaks, and community favorites.
-                          </span>
-                        </span>
-                      </Link>
-
-                      <Link
-                        href="/awards"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
-                        role="menuitem"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-yellow-300/10 text-yellow-100 ring-1 ring-yellow-200/15">
-                          <Trophy size={17} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-white">Awards & ranks</span>
-                          <span className="block truncate text-xs text-slate-400">
-                            Learn every rank, badge, and creator goal.
-                          </span>
-                        </span>
-                      </Link>
-
-                      <Link
-                        href="/midi?sort=downloads"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-gray-200 transition hover:bg-white/[0.06]"
-                        role="menuitem"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200 ring-1 ring-emerald-200/15">
-                          <TrendingUp size={17} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-white">Most Downloaded</span>
-                          <span className="block truncate text-xs text-slate-400">
-                            Jump into MIDI files people are saving most.
-                          </span>
-                        </span>
-                      </Link>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-white/[0.02] p-2">
-                      <Link
-                        href="/about"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
-                        role="menuitem"
-                      >
-                        <Info size={14} className="text-indigo-200" />
-                        About
-                      </Link>
-
-                      <Link
-                        href="/contact"
-                        onClick={() => setDiscoverOpen(false)}
-                        className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-300/30 hover:text-white"
-                        role="menuitem"
-                      >
-                        <Mail size={14} className="text-cyan-200" />
-                        Contact
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Upload */}
-              <button
-                type="button"
-                onClick={goUpload}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl
-                  bg-gradient-to-r from-blue-500 to-indigo-500
-                  hover:from-blue-400 hover:to-indigo-400
-                  font-semibold text-white shadow-lg transition"
-              >
-                <Upload size={16} />
-                Upload
-              </button>
-            </div>
-
-            {/* Profile / Login */}
-            {user ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDiscoverOpen(false);
-                    setProfileOpen((v) => !v);
-                  }}
-                  className="flex items-center gap-2 pl-2 pr-3 py-2 rounded-xl
-                    bg-gray-900/50 border border-gray-700
-                    hover:border-blue-400/70 hover:bg-gray-900/70 transition
-                    shadow-[0_0_0_rgba(0,0,0,0)] hover:shadow-[0_0_18px_rgba(96,165,250,0.15)]"
-                  title={user.email ?? "Account"}
-                >
-                  <ProfileAvatar
-                    src={avatarUrl}
-                    name={username ?? user.email}
-                    sizeClassName="h-9 w-9"
-                  />
-
-                  <div className="hidden lg:flex flex-col leading-tight text-left">
-                    <span className="text-sm font-semibold text-white max-w-[140px] truncate">
-                      {username ?? "User"}
-                    </span>
-                    <span className="text-[11px] text-gray-400 max-w-[140px] truncate">
-                      {user.email}
-                    </span>
-                  </div>
-                </button>
-
-                {profileOpen && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute right-0 mt-2 w-64 rounded-2xl
-                      bg-gray-900 border border-gray-700 shadow-2xl overflow-hidden
-                      animate-in fade-in zoom-in-95"
-                  >
-                    <div className="px-4 py-3 border-b border-gray-700">
-                      <div className="flex items-center gap-3">
-                        <ProfileAvatar
-                          src={avatarUrl}
-                          name={username ?? user.email}
-                          sizeClassName="h-11 w-11"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-400">Signed in as</p>
-                          <p className="truncate text-sm font-semibold text-white">
-                            {username ?? "User"}
-                          </p>
-                          <p className="truncate text-xs text-gray-400 mt-0.5">
-                            {user.email}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="py-1">
-                      <Link
-                        href="/profile"
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
-                      >
-                        <UserIcon size={16} className="text-blue-300" />
-                        Profile
-                      </Link>
-
-                      <Link
-                        href="/bookmarks"
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
-                      >
-                        <Bookmark size={16} className="text-blue-400" />
-                        Bookmarks
-                      </Link>
-
-                      <Link
-                        href="/myuploads"
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition"
-                      >
-                        <UploadCloud size={16} className="text-indigo-300" />
-                        My Uploads
-                      </Link>
-
-                      <Link
-                        href="/connections"
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/5 transition"
-                      >
-                        <Users size={16} className="text-emerald-300" />
-                        Connections
-                      </Link>
-                      {isAdmin ? (
-                        <Link
-                          href="/admin/imports"
-                          onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-cyan-100 hover:bg-cyan-300/10 transition"
-                        >
-                          <ClipboardList size={16} className="text-cyan-300" />
-                          Import Inbox
-                        </Link>
-                      ) : null}
-                    </div>
-
-                    <div className="h-px bg-gray-700" />
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await pocketbase.auth.signOut();
-                        setProfileOpen(false);
-                        router.push("/");
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-300 hover:bg-red-500/10 transition"
-                    >
-                      <LogOut size={16} />
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl
-                  border border-gray-700 text-gray-200
-                  hover:border-blue-400 hover:text-white
-                  hover:shadow-[0_0_12px_rgba(96,165,250,0.25)]
-                  transition-all duration-200"
-              >
-                <LogIn size={16} />
-                Log In
-              </Link>
-            )}
-          </div>
-
-          {/* Mobile menu toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            className="md:hidden text-gray-300 hover:text-white"
-            aria-label="Open menu"
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+        <div className="gmm-header-actions">
+          <button type="button" onClick={goUpload} className="gmm-upload-command">
+            <Upload size={16} /> <span>Upload</span>
           </button>
+          <HeaderAccount />
         </div>
 
-        {/* Mobile Menu */}
-        {mobileOpen && (
-          <div className="md:hidden mt-4 pb-6 border-t border-gray-800 pt-6">
-            <form
-              onSubmit={handleSearch}
-              className="relative flex items-center bg-gray-800/70 rounded-2xl overflow-visible border border-gray-700"
-            >
-              <input
-                type="text"
-                placeholder="Search MIDI..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-                className="w-full px-4 py-3 bg-transparent text-white focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="px-4 text-gray-300 hover:text-white"
-                aria-label="Search"
-              >
-                <Search size={18} />
-              </button>
-              {searchDropdown}
-            </form>
-
-            <nav className="mt-4 grid gap-2 text-sm">
-              <Link
-                href="/midi"
-                onClick={closeAll}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-cyan-300/30 hover:text-white"
-              >
-                <Music size={16} className="text-blue-200" />
-                All MIDI
-              </Link>
-
-              <Link
-                href="/creators"
-                onClick={closeAll}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-amber-200/30 hover:text-white"
-              >
-                <Award size={16} className="text-amber-200" />
-                Top Creators
-              </Link>
-
-              <Link
-                href="/awards"
-                onClick={closeAll}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-yellow-200/30 hover:text-white"
-              >
-                <Trophy size={16} className="text-yellow-100" />
-                Awards & ranks
-              </Link>
-
-              <Link
-                href="/contact"
-                onClick={closeAll}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-cyan-300/30 hover:text-white"
-              >
-                <Mail size={16} className="text-cyan-200" />
-                Contact
-              </Link>
-
-              <Link
-                href="/about"
-                onClick={closeAll}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-gray-200 transition hover:border-indigo-300/30 hover:text-white"
-              >
-                <Info size={16} className="text-indigo-200" />
-                About
-              </Link>
-            </nav>
-
-            <div className="flex flex-col gap-3 pt-4">
-              <button
-                type="button"
-                onClick={goUpload}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                  bg-gradient-to-r from-blue-500 to-indigo-500
-                  hover:from-blue-400 hover:to-indigo-400
-                  font-semibold text-white shadow-lg transition"
-              >
-                <Upload size={16} />
-                Upload MIDI
-              </button>
-
-              {isAdmin ? (
-                <Link
-                  href="/admin/imports"
-                  onClick={closeAll}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 font-semibold text-cyan-100 transition hover:border-cyan-300/40"
-                >
-                  <ClipboardList size={16} className="text-cyan-300" />
-                  Import Inbox
-                </Link>
-              ) : null}
-
-              {user ? (
-                <>
-                  <Link
-                    href="/profile"
-                    onClick={closeAll}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                      border border-gray-700 text-gray-200 hover:border-blue-400 transition"
-                  >
-                    <ProfileAvatar
-                      src={avatarUrl}
-                      name={username ?? user.email}
-                      sizeClassName="h-6 w-6"
-                    />
-                    Profile
-                  </Link>
-
-                  <Link
-                    href="/bookmarks"
-                    onClick={closeAll}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                      border border-gray-700 text-gray-200 hover:border-blue-400 transition"
-                  >
-                    <Bookmark size={16} className="text-blue-400" />
-                    Bookmarks
-                  </Link>
-
-                  <Link
-                    href="/myuploads"
-                    onClick={closeAll}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                      border border-gray-700 text-gray-200 hover:border-blue-400 transition"
-                  >
-                    <UploadCloud size={16} className="text-indigo-300" />
-                    My Uploads
-                  </Link>
-
-                  <Link
-                    href="/connections"
-                    onClick={closeAll}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                      border border-gray-700 text-gray-200 hover:border-blue-400 transition"
-                  >
-                    <Users size={16} className="text-emerald-300" />
-                    Connections
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await pocketbase.auth.signOut();
-                      closeAll();
-                      router.push("/");
-                    }}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                      text-red-300 border border-red-500/30 hover:bg-red-500/10 transition"
-                  >
-                    <LogOut size={16} />
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  onClick={closeAll}
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                    border border-gray-700 text-gray-200 hover:border-blue-400 transition"
-                >
-                  <LogIn size={16} />
-                  Log In
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          className="gmm-mobile-toggle"
+          onClick={() => setMobileOpen((value) => !value)}
+          aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={mobileOpen}
+        >
+          {mobileOpen ? <X size={21} /> : <Menu size={21} />}
+        </button>
       </div>
+
+      {mobileOpen ? (
+        <div className="gmm-mobile-menu">
+          <HeaderSearch onNavigate={close} />
+          <nav aria-label="Mobile navigation">
+            {navigation.map((item) => (
+              <Link key={item.href} href={item.href} data-active={isNavActive(pathname, item.href)} onClick={close}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="gmm-mobile-actions">
+            <button type="button" onClick={goUpload}><Upload size={16} /> Upload MIDI</button>
+            {user ? (
+              <>
+                <MobileLink href="/profile" icon={<UserRound size={16} />} label="Profile" close={close} />
+                <MobileLink href="/bookmarks" icon={<Bookmark size={16} />} label="Bookmarks" close={close} />
+                <MobileLink href="/myuploads" icon={<UploadCloud size={16} />} label="My uploads" close={close} />
+                <MobileLink href="/connections" icon={<Users size={16} />} label="Connections" close={close} />
+                <MobileLink href="/awards" icon={<Award size={16} />} label="Awards & ranks" close={close} />
+                {isAdmin ? <MobileLink href="/admin/imports" icon={<ClipboardList size={16} />} label="Import inbox" close={close} /> : null}
+                <button
+                  type="button"
+                  className="text-red-300"
+                  onClick={async () => {
+                    await pocketbase.auth.signOut();
+                    close();
+                    router.push("/");
+                  }}
+                >
+                  <LogOut size={16} /> Sign out
+                </button>
+              </>
+            ) : (
+              <MobileLink href="/login" icon={<LogIn size={16} />} label="Log in" close={close} />
+            )}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
+}
+
+function MobileLink({ href, icon, label, close }: { href: string; icon: React.ReactNode; label: string; close: () => void }) {
+  return <Link href={href} onClick={close}>{icon}<span>{label}</span></Link>;
 }

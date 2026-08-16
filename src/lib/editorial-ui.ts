@@ -18,3 +18,8 @@ export function formatMetric(value: number): string {
 
   return `${(value / 1_000_000).toFixed(1).replace(".0", "")}M`;
 }
+
+export function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
