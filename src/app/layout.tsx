@@ -6,6 +6,7 @@ import "./library.css";
 import "./catalog.css";
 import "./detail.css";
 import "./detail-overrides.css";
+import "./community.css";
 import type { Metadata } from "next";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";

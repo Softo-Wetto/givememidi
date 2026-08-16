@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import { Award, Crown, Music2, Sparkles, Star, TrendingUp, Trophy, Upload, Users } from "lucide-react";
@@ -51,7 +52,7 @@ export default async function CreatorsPage() {
 
   if (ids.length === 0) {
     return (
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+      <main className="gmm-public-page min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
         <div className="mx-auto max-w-7xl px-6 py-12">
           <h1 className="text-4xl font-black">Creators</h1>
           <p className="mt-2 text-gray-400">No creators found yet.</p>
@@ -161,7 +162,7 @@ export default async function CreatorsPage() {
   const totalPoints = leaders.reduce((sum, creator) => sum + creator.points, 0);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+    <main className="gmm-public-page min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
         <div className="relative mx-auto max-w-7xl px-6 pb-10 pt-14">
@@ -275,7 +276,7 @@ function Leaderboard({
             <div className="flex items-center gap-4">
               <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/10">
                 {creator.avatar_url ? (
-                  <img src={creator.avatar_url} alt={creator.username} className="h-full w-full object-cover" />
+                  <Image unoptimized fill src={creator.avatar_url} alt={creator.username} sizes="48px" className="object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm font-bold text-cyan-100">
                     {creator.username?.slice(0, 1).toUpperCase() || "U"}

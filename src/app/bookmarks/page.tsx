@@ -278,7 +278,7 @@ export default function BookmarksPage() {
 
   if (loading) {
     return (
-      <main className="min-h-[70vh] flex items-center justify-center text-slate-400">
+      <main className="gmm-public-page min-h-[70vh] flex items-center justify-center text-slate-400">
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4">
           <Loader className="animate-spin text-cyan-200" size={18} />
           Loading bookmarks...
@@ -288,7 +288,7 @@ export default function BookmarksPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+    <main className="gmm-public-page min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-0 h-72 w-[900px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
       </div>

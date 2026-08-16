@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { pocketbase } from "../../lib/pocketbaseClient";
@@ -324,13 +325,9 @@ export default function MyUploadsPage() {
                 key={m.id}
                 className="card-lift bg-white/[0.055] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col hover:border-cyan-300/35"
               >
-                <div className="w-full h-44 bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
+                <div className="relative w-full h-44 bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
                   {m.pdf_url ? (
-                    <img
-                      src="/sheet-music-placeholder.png"
-                      alt="Sheet music available"
-                      className="object-contain w-5/6 h-5/6"
-                    />
+                    <Image fill src="/sheet-music-placeholder.png" alt="Sheet music available" sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-5" />
                   ) : (
                     <div className="text-gray-400 text-sm font-medium">❌ No PDF</div>
                   )}

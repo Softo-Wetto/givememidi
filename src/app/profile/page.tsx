@@ -1,6 +1,8 @@
 // src/app/profile/page.tsx
 "use client";
 
+import Image from "next/image";
+
 import { useEffect, useMemo, useState } from "react";
 import { pocketbase } from "../../lib/pocketbaseClient";
 import { updateRecord } from "../../lib/pocketbase/client";
@@ -427,16 +429,16 @@ export default function ProfilePage() {
       : undefined;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white p-6">
+    <main className="gmm-public-page min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header card */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               {/* Avatar */}
-              <div className="w-14 h-14 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
+              <div className="relative w-14 h-14 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <Image unoptimized fill src={avatarUrl} alt="Avatar" sizes="56px" className="object-cover" />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400 text-xl">👤</div>
                 )}

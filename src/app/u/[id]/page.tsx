@@ -1,6 +1,7 @@
 // src/app/u/[id]/page.tsx
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import FollowButton from "./FollowButton";
 import { MidiCard } from "../../components/MidiCard";
@@ -221,7 +222,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const hasAnyUploads = (uploads?.length ?? 0) > 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <main className="gmm-public-page min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-10 space-y-12">
         {/* Header */}
         <section className={profileShellClass(profile.cosmetic_theme)}>
@@ -232,13 +233,9 @@ export default async function PublicProfilePage({ params }: Props) {
           <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div className="flex items-start gap-5">
               {/* Avatar */}
-              <div className="w-20 h-20 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
+              <div className="relative w-20 h-20 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
                 {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.username}
-                    className="w-full h-full object-cover"
-                  />
+                  <Image unoptimized fill src={profile.avatar_url} alt={profile.username} sizes="80px" className="object-cover" />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400 text-2xl">
                     👤

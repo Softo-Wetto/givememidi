@@ -1,0 +1,91 @@
+.gmm-public-page {
+  min-height: 100vh;
+  background: var(--gmm-ink) !important;
+  color: white;
+}
+
+.gmm-public-page > [class*="absolute"] { opacity: 0.35; }
+.gmm-public-page .max-w-7xl,
+.gmm-public-page .max-w-6xl,
+.gmm-public-page .max-w-5xl { max-width: var(--gmm-shell); }
+
+.gmm-public-page h1 {
+  max-width: 16ch;
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-size: clamp(3.2rem, 7vw, 7rem) !important;
+  font-weight: 900;
+  line-height: 0.88 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase;
+}
+
+.gmm-public-page h2,
+.gmm-public-page h3,
+.gmm-public-page p,
+.gmm-public-page a,
+.gmm-public-page button,
+.gmm-public-page input,
+.gmm-public-page select,
+.gmm-public-page textarea { letter-spacing: 0 !important; }
+
+.gmm-public-page [class~="rounded-3xl"],
+.gmm-public-page [class~="rounded-2xl"] { border-radius: 8px !important; }
+.gmm-public-page [class~="rounded-xl"] { border-radius: 6px !important; }
+
+.gmm-public-page [class*="bg-white/"] {
+  background-color: rgba(7, 11, 20, 0.9) !important;
+}
+
+.gmm-public-page [class*="shadow-xl"],
+.gmm-public-page [class*="shadow-2xl"] { box-shadow: none !important; }
+
+.gmm-public-page section,
+.gmm-public-page article { border-color: var(--gmm-line); }
+
+.gmm-public-page [class*="border-white/"] { border-color: var(--gmm-line) !important; }
+
+.gmm-public-page button,
+.gmm-public-page a {
+  transition-duration: 160ms !important;
+}
+
+.gmm-public-page input,
+.gmm-public-page select,
+.gmm-public-page textarea {
+  border-radius: 6px !important;
+}
+
+.gmm-public-page input:focus,
+.gmm-public-page select:focus,
+.gmm-public-page textarea:focus {
+  border-color: var(--gmm-cyan) !important;
+  box-shadow: 0 0 0 2px rgba(65, 217, 255, 0.12) !important;
+}
+
+.gmm-public-page table {
+  border-collapse: collapse;
+  border-color: var(--gmm-line);
+}
+
+.gmm-public-page thead {
+  background: #050913;
+  color: var(--gmm-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.gmm-public-page tbody tr { border-color: var(--gmm-line); }
+.gmm-public-page tbody tr:hover { background: #07101e; }
+
+.gmm-public-page [class*="uppercase"] { letter-spacing: 0 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gmm-public-page *,
+  .gmm-public-page *::before,
+  .gmm-public-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

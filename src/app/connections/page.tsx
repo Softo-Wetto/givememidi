@@ -201,7 +201,6 @@ export default function FollowingPage() {
       await fetchPage(user.id, tab, 1);
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   useEffect(() => {
@@ -227,7 +226,7 @@ export default function FollowingPage() {
   }, [list, q]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
+    <main className="gmm-public-page min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
         {/* Header */}
         <div className="hover-shine rounded-3xl border border-white/10 bg-white/[0.055] p-7 shadow-xl">
