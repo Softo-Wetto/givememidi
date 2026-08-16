@@ -13,7 +13,7 @@
         "import:midis": "node scripts/import-midi-batch.mjs",
         "import:download": "node scripts/download-librescore-jobs.mjs",
         "import:worker": "node scripts/import-worker-server.mjs",
-        "test": "node --no-warnings --test --experimental-strip-types src/lib/import-queue.test.ts"
+        "test": "node --no-warnings --test --experimental-strip-types src/lib/import-queue.test.ts src/lib/editorial-ui.test.ts"
     },
     "dependencies": {
         "@tonejs/midi": "^2.0.28",
