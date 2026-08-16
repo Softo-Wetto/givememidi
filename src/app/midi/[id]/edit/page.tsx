@@ -276,7 +276,7 @@ export default function EditMidiPage() {
 
   if (loading || !row) {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white flex items-center justify-center">
+      <main className="gmm-ops-page min-h-screen bg-gradient-to-b from-gray-900 to-black text-white flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-400">
           <Loader2 className="animate-spin" size={18} />
           Loading editor…
@@ -286,7 +286,7 @@ export default function EditMidiPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
+    <main className="gmm-ops-page min-h-screen bg-gradient-to-b from-gray-900 via-black to-black text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-72 w-[900px] rounded-full bg-blue-500/10 blur-3xl" />
       </div>

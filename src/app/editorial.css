@@ -40,7 +40,7 @@ body {
   font-weight: 800;
   line-height: 1.2;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0;
 }
 
 .gmm-display,
@@ -101,7 +101,7 @@ body {
   font-weight: 850;
   line-height: 1;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
@@ -132,7 +132,7 @@ body {
   font-size: 0.76rem;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
@@ -144,7 +144,7 @@ body {
 
 @media (max-width: 767px) {
   .gmm-heading { align-items: flex-start; flex-direction: column; gap: 1.25rem; }
-  .gmm-display { font-size: clamp(3.4rem, 20vw, 6.5rem); }
+  .gmm-display { max-width: 100%; font-size: clamp(3.1rem, 16vw, 5rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {

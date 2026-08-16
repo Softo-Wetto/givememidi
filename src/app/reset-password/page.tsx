@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6 flex items-center justify-center">
+    <main className="gmm-ops-page min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6 flex items-center justify-center">
       <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 shadow-xl">
         <div className="flex items-center gap-2 mb-2">
           <KeyRound className="text-blue-300" size={18} />

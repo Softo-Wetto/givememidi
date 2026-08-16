@@ -1,7 +1,7 @@
 .gmm-catalog { min-height: 100vh; background: var(--gmm-ink); color: white; }
 .gmm-catalog-heading { border-bottom: 1px solid var(--gmm-line); background: var(--gmm-surface); }
 .gmm-catalog-heading .gmm-shell { display: flex; align-items: end; justify-content: space-between; gap: 2rem; padding-block: clamp(3rem, 7vw, 6rem); }
-.gmm-catalog-heading p:last-child { max-width: 38rem; margin-top: 1rem; color: var(--gmm-muted); line-height: 1.7; }
+.gmm-catalog-heading p:last-child { max-width: 38rem; overflow-wrap: anywhere; margin-top: 1rem; color: var(--gmm-muted); line-height: 1.7; }
 .gmm-catalog-count { display: flex; min-width: 8rem; flex-direction: column; align-items: flex-end; border-left: 1px solid var(--gmm-line); padding-left: 1.5rem; }
 .gmm-catalog-count strong { font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; font-size: 4rem; line-height: 0.9; color: var(--gmm-cyan); }
 .gmm-catalog-count span { margin-top: 0.45rem; color: var(--gmm-muted); font-size: 0.65rem; font-weight: 850; text-transform: uppercase; }

@@ -65,7 +65,7 @@ export default function ImportInboxClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[#020617] px-4 py-6 text-white sm:px-6 md:py-8">
+    <main className="gmm-ops-page min-h-screen bg-[#020617] px-4 py-6 text-white sm:px-6 md:py-8">
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div className="flex items-start gap-3">

@@ -51,7 +51,7 @@
   font-size: 0.76rem;
   font-weight: 850;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .gmm-desktop-nav a::after {
@@ -129,7 +129,7 @@
   font-size: 0.74rem;
   font-weight: 850;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .gmm-upload-command { border: 1px solid var(--gmm-cyan); background: var(--gmm-cyan); color: #020617; }
@@ -151,7 +151,7 @@
 .gmm-account-signout { border-top: 1px solid var(--gmm-line); color: #fca5a5; }
 .gmm-account-loading { width: 2.55rem; height: 2.55rem; border: 1px solid var(--gmm-line); border-radius: 6px; background: #050913; }
 
-.gmm-mobile-toggle { display: none; width: 2.55rem; height: 2.55rem; place-items: center; border: 1px solid var(--gmm-line); border-radius: 6px; color: white; }
+.gmm-mobile-toggle { display: none; width: 2.55rem; justify-self: end; height: 2.55rem; place-items: center; border: 1px solid var(--gmm-line); border-radius: 6px; color: white; }
 .gmm-mobile-menu { display: none; }
 
 .gmm-site-footer { overflow: hidden; border-top: 1px solid var(--gmm-line); background: #02040a; }
@@ -163,12 +163,12 @@
 .gmm-footer-brand > a svg { color: var(--gmm-cyan); }
 .gmm-footer-brand p { max-width: 26rem; margin-top: 1.2rem; color: var(--gmm-muted); font-size: 0.9rem; line-height: 1.7; }
 .gmm-footer-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0.7rem; }
-.gmm-footer-column h3 { margin-bottom: 0.35rem; color: white; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.14em; }
+.gmm-footer-column h3 { margin-bottom: 0.35rem; color: white; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }
 .gmm-footer-column a { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--gmm-muted); font-size: 0.82rem; }
 .gmm-footer-column a:hover { color: var(--gmm-cyan); }
 .gmm-footer-signature { overflow: hidden; color: #0b1220; font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; font-size: clamp(5rem, 16vw, 14rem); line-height: 0.72; text-align: center; white-space: nowrap; }
 .gmm-footer-bottom { border-top: 1px solid var(--gmm-line); }
-.gmm-footer-bottom .gmm-shell { display: flex; justify-content: space-between; gap: 1rem; padding-block: 1rem; color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.gmm-footer-bottom .gmm-shell { display: flex; justify-content: space-between; gap: 1rem; padding-block: 1rem; color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0; }
 
 @media (max-width: 1120px) {
   .gmm-header-inner { grid-template-columns: auto 1fr auto; }

@@ -93,7 +93,7 @@ export default function LoginClient() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#111827_0%,#020617_45%,#000_100%)] text-white">
+    <main className="gmm-ops-page relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#111827_0%,#020617_45%,#000_100%)] text-white">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/60 to-transparent" />
 
