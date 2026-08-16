@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
+import { ArrowUpDown, LoaderCircle, Search, SlidersHorizontal, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MidiCard } from "../components/MidiCard";
-import { ArrowUpDown, Loader, Music2, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 
 type SortKey = "newest" | "downloads" | "title";
 const PAGE_SIZE = 9;
@@ -21,216 +21,131 @@ type MidiRow = {
   bpm?: number | null;
 };
 
-type MidiWithRatings = MidiRow & {
-  avgRating: number | null;
-  ratingCount: number;
-};
-
+type MidiWithRatings = MidiRow & { avgRating: number | null; ratingCount: number };
 type RatingAgg = { sum: number; count: number };
+type RatingRow = { midi_id: string; rating: number };
 
 export default function AllMidiClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // Create the data client only on the browser side.
-  const pocketbase = useMemo(() => {
-    return createPocketBaseClient();
-  }, []);
-
-  // URL -> state
-  const initialSearch = searchParams.get("search") || "";
-  const initialGenre = searchParams.get("genre") || "";
-  const initialSort = (searchParams.get("sort") as SortKey) || "newest";
-
+  const pocketbase = useMemo(() => createPocketBaseClient(), []);
   const [midis, setMidis] = useState<MidiWithRatings[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
-
-  const [search, setSearch] = useState(initialSearch);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
-  const [genre, setGenre] = useState(initialGenre);
-  const [sort, setSort] = useState<SortKey>(initialSort);
-
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("search") || "");
+  const [genre, setGenre] = useState(searchParams.get("genre") || "");
+  const [sort, setSort] = useState<SortKey>((searchParams.get("sort") as SortKey) || "newest");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  async function fetchRatingAggForMidiIds(ids: string[]) {
-    if (ids.length === 0) return new Map<string, RatingAgg>();
-
-    const { data, error } = await pocketbase
-      .from("midi_ratings")
-      .select("midi_id, rating")
-      .in("midi_id", ids);
-
+  async function ratingMap(ids: string[]) {
+    if (!ids.length) return new Map<string, RatingAgg>();
+    const { data, error } = await pocketbase.from("midi_ratings").select<RatingRow>("midi_id, rating").in("midi_id", ids);
     if (error) {
       console.error("ratings bulk fetch error:", error);
       return new Map<string, RatingAgg>();
     }
-
     const map = new Map<string, RatingAgg>();
-    for (const r of data ?? []) {
-      const prev = map.get((r as any).midi_id) ?? { sum: 0, count: 0 };
-      map.set((r as any).midi_id, {
-        sum: prev.sum + (((r as any).rating ?? 0) as number),
-        count: prev.count + 1,
-      });
+    for (const row of data ?? []) {
+      const current = map.get(row.midi_id) ?? { sum: 0, count: 0 };
+      map.set(row.midi_id, { sum: current.sum + Number(row.rating ?? 0), count: current.count + 1 });
     }
     return map;
   }
 
-  function mergeRatings(rows: MidiRow[], ratingMap: Map<string, RatingAgg>): MidiWithRatings[] {
-    return rows.map((m) => {
-      const agg = ratingMap.get(m.id);
-      const ratingCount = agg?.count ?? 0;
-      const avgRating = ratingCount ? agg!.sum / ratingCount : null;
-      return { ...m, avgRating, ratingCount };
-    });
-  }
+  const mergeRatings = (rows: MidiRow[], map: Map<string, RatingAgg>): MidiWithRatings[] => rows.map((row) => {
+    const rating = map.get(row.id);
+    return { ...row, avgRating: rating?.count ? rating.sum / rating.count : null, ratingCount: rating?.count ?? 0 };
+  });
 
-  // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 350);
-    return () => clearTimeout(t);
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Sync state -> URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     if (genre) params.set("genre", genre);
-    if (sort) params.set("sort", sort);
+    if (sort !== "newest") params.set("sort", sort);
+    const query = params.toString();
+    router.replace(query ? `/midi?${query}` : "/midi");
+  }, [genre, router, search, sort]);
 
-    const qs = params.toString();
-    router.replace(qs ? `/midi?${qs}` : "/midi");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, genre, sort]);
-
-  // Fetch genres once
   useEffect(() => {
-    const fetchGenres = async () => {
-      const { data, error } = await pocketbase
-        .from("music_files")
-        .select("genre")
-        .not("genre", "is", null);
-
-      if (!error && data) {
-        const unique = Array.from(
-          new Set(
-            (data as any[])
-              .map((r) => (r.genre || "").trim())
-              .filter(Boolean)
-          )
-        ).sort((a, b) => a.localeCompare(b));
-        setGenres(unique);
-      }
-    };
-    fetchGenres();
+    void pocketbase
+      .from("music_files")
+      .select<{ genre: string | null }>("genre")
+      .not("genre", "is", null)
+      .then(({ data, error }) => {
+        if (error) return;
+        const values = [...new Set((data ?? []).map((row) => row.genre?.trim()).filter((value): value is string => Boolean(value)))];
+        setGenres(values.sort((a, b) => a.localeCompare(b)));
+      });
   }, [pocketbase]);
 
-  const applySort = (query: any) => {
-    if (sort === "newest") return query.order("created_at", { ascending: false });
-    if (sort === "downloads") return query.order("downloads", { ascending: false });
-    return query.order("title", { ascending: true });
-  };
-
   const buildQuery = () => {
-    let query = pocketbase
-      .from("music_files")
-      .select("id,title,composer,description,downloads,pdf_url,created_at,genre,bpm");
-
+    let query = pocketbase.from("music_files").select("id,title,composer,description,downloads,pdf_url,created_at,genre,bpm");
     if (genre) query = query.eq("genre", genre);
-
-    const q = debouncedSearch.trim();
-    if (q) {
-      query = query.or(`title.ilike.%${q}%,composer.ilike.%${q}%,description.ilike.%${q}%,genre.ilike.%${q}%`);
-    }
-
-    query = applySort(query);
-    return query;
+    const value = debouncedSearch.trim();
+    if (value) query = query.or(`title.ilike.%${value}%,composer.ilike.%${value}%,description.ilike.%${value}%,genre.ilike.%${value}%`);
+    if (sort === "downloads") return query.order("downloads", { ascending: false });
+    if (sort === "title") return query.order("title", { ascending: true });
+    return query.order("created_at", { ascending: false });
   };
 
-  // Fetch first page
   useEffect(() => {
-    const fetchFirstPage = async () => {
+    const load = async () => {
       setLoading(true);
       setHasMore(true);
-
       const { data, error } = await buildQuery().range(0, PAGE_SIZE - 1);
-
       if (error) {
-        console.error("Fetch midis error:", error);
+        console.error("Fetch MIDI error:", error);
         setMidis([]);
         setHasMore(false);
         setLoading(false);
         return;
       }
-
       const rows = (data ?? []) as MidiRow[];
-      const ids = rows.map((r) => r.id);
-      const ratingMap = await fetchRatingAggForMidiIds(ids);
-      const withRatings = mergeRatings(rows, ratingMap);
-
-      setMidis(withRatings);
+      setMidis(mergeRatings(rows, await ratingMap(rows.map((row) => row.id))));
       setHasMore(rows.length === PAGE_SIZE);
       setLoading(false);
     };
-
-    fetchFirstPage();
+    void load();
+    // Query building intentionally follows these three filter values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, debouncedSearch, sort]);
+  }, [debouncedSearch, genre, sort]);
 
-  const fetchMore = async () => {
+  const loadMore = async () => {
     if (loading || loadingMore || !hasMore) return;
-
     setLoadingMore(true);
-
-    const from = midis.length;
-    const to = from + PAGE_SIZE - 1;
-
-    const { data, error } = await buildQuery().range(from, to);
-
+    const { data, error } = await buildQuery().range(midis.length, midis.length + PAGE_SIZE - 1);
     if (error) {
-      console.error("Fetch more error:", error);
+      console.error("Fetch more MIDI error:", error);
       setHasMore(false);
       setLoadingMore(false);
       return;
     }
-
     const rows = (data ?? []) as MidiRow[];
-    const ids = rows.map((r) => r.id);
-    const ratingMap = await fetchRatingAggForMidiIds(ids);
-    const withRatings = mergeRatings(rows, ratingMap);
-
-    setMidis((prev) => [...prev, ...withRatings]);
+    const rowsWithRatings = mergeRatings(rows, await ratingMap(rows.map((row) => row.id)));
+    setMidis((current) => [...current, ...rowsWithRatings]);
     setHasMore(rows.length === PAGE_SIZE);
     setLoadingMore(false);
   };
 
-  // Infinite scroll observer
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) fetchMore();
-      },
-      { rootMargin: "600px" }
-    );
-
-    obs.observe(el);
-    return () => obs.disconnect();
+    const element = sentinelRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) void loadMore();
+    }, { rootMargin: "600px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+    // Observer refreshes when the current result boundary moves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [midis.length, hasMore, loading, loadingMore]);
-
-  const resultsLabel = useMemo(() => {
-    if (loading) return "Loading…";
-    return `${midis.length} result${midis.length === 1 ? "" : "s"}`;
-  }, [loading, midis.length]);
-
-  const popularGenres = useMemo(() => genres.slice(0, 8), [genres]);
+  }, [hasMore, loading, loadingMore, midis.length]);
 
   const clearFilters = () => {
     setSearch("");
@@ -238,240 +153,63 @@ export default function AllMidiClientPage() {
     setSort("newest");
   };
 
-  const chips = useMemo(() => {
-    const list: { key: string; label: string; onRemove: () => void }[] = [];
-    if (search.trim()) {
-      list.push({
-        key: "search",
-        label: `Search: "${search.trim()}"`,
-        onRemove: () => setSearch(""),
-      });
-    }
-    if (genre) {
-      list.push({
-        key: "genre",
-        label: `Genre: ${genre}`,
-        onRemove: () => setGenre(""),
-      });
-    }
-    if (sort && sort !== "newest") {
-      list.push({
-        key: "sort",
-        label: `Sort: ${sort === "downloads" ? "Most downloaded" : "Title A–Z"}`,
-        onRemove: () => setSort("newest"),
-      });
-    }
-    return list;
-  }, [search, genre, sort]);
+  const activeFilters = [
+    search.trim() ? { key: "search", label: `Search / ${search.trim()}`, remove: () => setSearch("") } : null,
+    genre ? { key: "genre", label: `Genre / ${genre}`, remove: () => setGenre("") } : null,
+    sort !== "newest" ? { key: "sort", label: `Sort / ${sort === "downloads" ? "Most downloaded" : "Title A-Z"}`, remove: () => setSort("newest") } : null,
+  ].filter((item): item is { key: string; label: string; remove: () => void } => Boolean(item));
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
-      <div className="max-w-7xl mx-auto px-6 pt-10 pb-20">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-6">
+    <main className="gmm-catalog">
+      <section className="gmm-catalog-heading">
+        <div className="gmm-shell">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.055] px-4 py-2 text-sm text-blue-100">
-              <Sparkles size={16} className="text-cyan-300" />
-              Browse, filter, preview, collect.
-            </div>
-            <h1 className="text-4xl font-black tracking-tight md:text-5xl">All MIDI files</h1>
-            <p className="text-gray-400 mt-3 max-w-2xl">
-              Search by title, composer, or genre. Filter, sort, and scroll to load more.
-            </p>
+            <p className="gmm-kicker">Library index</p>
+            <h1 className="gmm-section-title">All MIDI files</h1>
+            <p>Search the full collection by title, composer, description, or genre.</p>
           </div>
+          <div className="gmm-catalog-count"><strong>{loading ? "--" : midis.length}</strong><span>results loaded</span></div>
+        </div>
+      </section>
 
-          <div className="text-sm text-gray-400">
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3">
-              <Music2 size={16} className="text-cyan-300" />
-              {resultsLabel}
-            </span>
+      {genres.length ? (
+        <div className="gmm-catalog-genres">
+          <div className="gmm-shell">
+            <span>Quick genres</span>
+            {genres.slice(0, 8).map((item) => <button key={item} type="button" data-active={genre === item} onClick={() => setGenre(genre === item ? "" : item)}>{item}</button>)}
           </div>
         </div>
+      ) : null}
 
-        {popularGenres.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            {popularGenres.map((item) => (
-              <button
-                key={item}
-                onClick={() => setGenre(item)}
-                className={`tap rounded-full border px-3 py-1.5 text-sm transition ${
-                  genre === item
-                    ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
-                    : "border-white/10 bg-white/[0.045] text-slate-300 hover:border-cyan-300/35 hover:bg-cyan-300/10"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
+      <div className="gmm-catalog-toolbar-wrap">
+        <div className="gmm-shell">
+          <div className="gmm-catalog-toolbar">
+            <label className="gmm-catalog-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the library" />{search ? <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button> : null}</label>
+            <label><SlidersHorizontal size={16} /><select value={genre} onChange={(event) => setGenre(event.target.value)}><option value="">All genres</option>{genres.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label><ArrowUpDown size={16} /><select value={sort} onChange={(event) => setSort(event.target.value as SortKey)}><option value="newest">Newest</option><option value="downloads">Most downloaded</option><option value="title">Title A-Z</option></select></label>
+            <button type="button" onClick={clearFilters}>Reset</button>
           </div>
-        )}
-
-        {/* Chips */}
-        {chips.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {chips.map((c) => (
-              <button
-                key={c.key}
-                onClick={c.onRemove}
-                className="group flex items-center gap-2 px-3 py-1.5 rounded-full
-                  bg-white/5 border border-white/10 text-sm text-gray-200
-                  hover:bg-white/10 transition"
-                title="Remove filter"
-              >
-                <span className="truncate max-w-[260px]">{c.label}</span>
-                <X size={14} className="text-gray-400 group-hover:text-white" />
-              </button>
-            ))}
-
-            <button
-              onClick={clearFilters}
-              className="px-3 py-1.5 rounded-full text-sm
-                bg-gradient-to-r from-blue-500 to-indigo-500
-                hover:from-blue-400 hover:to-indigo-400 font-semibold shadow-lg transition"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-
-        {/* Filters (sticky) */}
-        <div className="sticky top-[72px] z-40 mb-8">
-          <div className="rounded-3xl border border-white/10 bg-black/50 p-4 shadow-xl shadow-black/30 backdrop-blur-xl">
-            <div className="flex flex-col md:flex-row gap-3 md:items-center">
-              {/* Search */}
-              <div className="flex-1 flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5 transition focus-within:border-cyan-300/50 focus-within:ring-2 focus-within:ring-cyan-300/30">
-                <Search size={16} className="text-gray-400" />
-                <input
-                  placeholder="Search title, composer, or genre…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-transparent outline-none text-white placeholder:text-gray-500"
-                />
-                {search.trim() && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="text-gray-400 hover:text-white"
-                    title="Clear search"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* Genre */}
-              <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5">
-                <SlidersHorizontal size={16} className="text-gray-400" />
-                <select
-                  className="bg-transparent outline-none text-white w-full md:w-52"
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                >
-                  <option value="">All genres</option>
-                  {genres.map((g) => (
-                    <option key={g} value={g} className="text-black">
-                      {g}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sort */}
-              <div className="flex items-center gap-2 bg-white/[0.055] border border-white/10 rounded-2xl px-3 py-2.5">
-                <ArrowUpDown size={16} className="text-gray-400" />
-                <select
-                  className="bg-transparent outline-none text-white w-full md:w-48"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
-                >
-                  <option value="newest" className="text-black">Newest</option>
-                  <option value="downloads" className="text-black">Most downloaded</option>
-                  <option value="title" className="text-black">Title (A–Z)</option>
-                </select>
-              </div>
-
-              <button
-                onClick={clearFilters}
-                className="tap md:ml-auto px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.055] hover:bg-white/10 transition"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
+          {activeFilters.length ? <div className="gmm-active-filters">{activeFilters.map((item) => <button key={item.key} type="button" onClick={item.remove}>{item.label}<X size={13} /></button>)}</div> : null}
         </div>
-
-        {/* Loading skeleton */}
-        {loading && (
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="skeleton h-[356px] rounded-2xl p-4">
-                <div className="h-48 rounded-lg bg-white/10 mb-4" />
-                <div className="h-5 bg-white/10 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-white/10 rounded w-1/2" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && midis.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-10 text-center">
-            <p className="text-xl font-semibold">No results</p>
-            <p className="text-gray-400 mt-2">Try changing your search or filters.</p>
-            <button
-              onClick={clearFilters}
-              className="btn-glow mt-6 px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 font-bold shadow-lg transition hover:brightness-110"
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
-
-        {!loading && midis.length > 0 && (
-          <>
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {midis.map((midi) => (
-                <MidiCard
-                  key={midi.id}
-                  id={midi.id}
-                  title={midi.title}
-                  composer={midi.composer || ""}
-                  downloads={midi.downloads ?? 0}
-                  pdfUrl={midi.pdf_url || null}
-                  genre={midi.genre}
-                  bpm={midi.bpm}
-                  avgRating={midi.avgRating}
-                  ratingCount={midi.ratingCount}
-                  createdAt={midi.created_at}
-                />
-              ))}
-            </div>
-
-            <div ref={sentinelRef} className="h-10" />
-
-            {loadingMore && (
-              <div className="flex items-center justify-center gap-2 text-gray-400 mt-8">
-                <Loader className="animate-spin" size={18} />
-                Loading more…
-              </div>
-            )}
-
-            {!loadingMore && hasMore && (
-              <div className="flex justify-center mt-10">
-                <button
-                  onClick={fetchMore}
-                  className="tap px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.055] hover:bg-white/10 transition"
-                >
-                  Load more
-                </button>
-              </div>
-            )}
-
-            {!hasMore && (
-              <div className="text-center text-gray-500 mt-10">You’ve reached the end.</div>
-            )}
-          </>
-        )}
       </div>
+
+      <section className="gmm-shell gmm-catalog-results">
+        {loading ? (
+          <div className="gmm-catalog-grid" aria-label="Loading MIDI files">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="gmm-catalog-skeleton"><i /><i /><i /></div>)}</div>
+        ) : midis.length ? (
+          <>
+            <div className="gmm-catalog-grid">
+              {midis.map((midi) => <MidiCard key={midi.id} id={midi.id} title={midi.title} composer={midi.composer} downloads={midi.downloads} pdfUrl={midi.pdf_url} genre={midi.genre} bpm={midi.bpm} avgRating={midi.avgRating} ratingCount={midi.ratingCount} createdAt={midi.created_at} />)}
+            </div>
+            <div ref={sentinelRef} className="h-8" />
+            {loadingMore ? <p className="gmm-catalog-loading"><LoaderCircle size={17} className="animate-spin" /> Loading more</p> : null}
+            {!loadingMore && hasMore ? <button type="button" className="gmm-catalog-more" onClick={() => void loadMore()}>Load more</button> : null}
+            {!hasMore ? <p className="gmm-catalog-end">End of the current library.</p> : null}
+          </>
+        ) : (
+          <div className="gmm-catalog-empty"><span>0 results</span><h2>Nothing matches that combination.</h2><p>Remove a filter or try a broader search term.</p><button type="button" onClick={clearFilters}>Clear filters</button></div>
+        )}
+      </section>
     </main>
   );
 }
