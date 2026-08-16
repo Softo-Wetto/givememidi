@@ -1,0 +1,25 @@
+.gmm-detail-workspace .rounded-3xl,
+.gmm-detail-pdf .rounded-3xl,
+.gmm-detail-workspace .rounded-2xl,
+.gmm-detail-pdf .rounded-2xl {
+  border-radius: 8px !important;
+}
+
+.gmm-detail-workspace .bg-white\/5,
+.gmm-detail-pdf .bg-white\/5 {
+  background-color: #050913 !important;
+}
+
+.gmm-detail-workspace .shadow-xl,
+.gmm-detail-pdf .shadow-xl,
+.gmm-detail-workspace .shadow-2xl,
+.gmm-detail-pdf .shadow-2xl {
+  box-shadow: none !important;
+}
+
+.gmm-detail-workspace button,
+.gmm-detail-pdf button,
+.gmm-detail-workspace a,
+.gmm-detail-pdf a {
+  letter-spacing: 0;
+}
