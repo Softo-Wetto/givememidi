@@ -1,23 +1,12 @@
 import { createPocketBaseClient } from "@/lib/pocketbaseClient";
+import { formatMetric } from "@/lib/editorial-ui";
+import { ArrowRight, Bookmark, FileMusic, Headphones, Search, Sparkles, Upload, Users } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import {
-  ArrowRight,
-  Award,
-  Bookmark,
-  FileText,
-  Flame,
-  Music2,
-  Search,
-  Sparkles,
-  Star,
-  UploadCloud,
-  Users,
-} from "lucide-react";
+import { AnimateIn } from "./components/AnimateIn";
+import { EditorialHeading, EditorialSection } from "./components/EditorialSection";
 import { MidiCard } from "./components/MidiCard";
 import { MidiRowScroller } from "./components/MidiRowScroller";
-import { FloatingNotes } from "./components/FloatingNotes";
-import { AnimateIn } from "./components/AnimateIn";
 
 export const dynamic = "force-dynamic";
 
@@ -37,447 +26,223 @@ type MidiRow = {
 };
 
 type RatingAgg = { sum: number; count: number };
+type RatingRow = { midi_id: string; rating: number };
 
-async function fetchRatingAggForMidiIds(ids: string[]) {
-  if (ids.length === 0) return new Map<string, RatingAgg>();
-
-  const { data, error } = await pocketbase
-    .from("midi_ratings")
-    .select("midi_id, rating")
-    .in("midi_id", ids);
-
+async function fetchRatings(ids: string[]) {
+  if (!ids.length) return new Map<string, RatingAgg>();
+  const { data, error } = await pocketbase.from("midi_ratings").select<RatingRow>("midi_id, rating").in("midi_id", ids);
   if (error) {
     console.error("ratings bulk fetch error:", error);
     return new Map<string, RatingAgg>();
   }
 
   const map = new Map<string, RatingAgg>();
-  for (const rating of data ?? []) {
-    const midiId = (rating as any).midi_id as string;
-    const prev = map.get(midiId) ?? { sum: 0, count: 0 };
-    map.set(midiId, {
-      sum: prev.sum + (((rating as any).rating ?? 0) as number),
-      count: prev.count + 1,
-    });
+  for (const row of data ?? []) {
+    const midiId = String(row.midi_id);
+    const current = map.get(midiId) ?? { sum: 0, count: 0 };
+    map.set(midiId, { sum: current.sum + Number(row.rating ?? 0), count: current.count + 1 });
   }
-
   return map;
 }
 
-async function fetchTopRatedMidiIds(limit = 15, minRatings = 2) {
-  const { data, error } = await pocketbase
-    .from("midi_ratings")
-    .select("midi_id, rating");
-
+async function fetchTopRatedIds(limit = 15, minRatings = 2) {
+  const { data, error } = await pocketbase.from("midi_ratings").select<RatingRow>("midi_id, rating");
   if (error) {
     console.error("top rated ratings fetch error:", error);
     return [] as string[];
   }
 
   const map = new Map<string, RatingAgg>();
-  for (const rating of data ?? []) {
-    const midiId = (rating as any).midi_id as string;
-    const prev = map.get(midiId) ?? { sum: 0, count: 0 };
-    map.set(midiId, {
-      sum: prev.sum + (((rating as any).rating ?? 0) as number),
-      count: prev.count + 1,
-    });
+  for (const row of data ?? []) {
+    const midiId = String(row.midi_id);
+    const current = map.get(midiId) ?? { sum: 0, count: 0 };
+    map.set(midiId, { sum: current.sum + Number(row.rating ?? 0), count: current.count + 1 });
   }
 
-  return Array.from(map.entries())
-    .map(([midiId, agg]) => ({ midiId, avg: agg.sum / agg.count, count: agg.count }))
+  return [...map.entries()]
+    .map(([id, rating]) => ({ id, average: rating.sum / rating.count, count: rating.count }))
     .filter((item) => item.count >= minRatings)
-    .sort((a, b) => b.avg - a.avg || b.count - a.count)
+    .sort((a, b) => b.average - a.average || b.count - a.count)
     .slice(0, limit)
-    .map((item) => item.midiId);
+    .map((item) => item.id);
 }
 
-function topGenresFrom(rows: MidiRow[]) {
+function collectGenres(rows: MidiRow[]) {
   const counts = new Map<string, number>();
   for (const row of rows) {
     const genre = row.genre?.trim();
-    if (!genre) continue;
-    counts.set(genre, (counts.get(genre) ?? 0) + 1);
+    if (genre) counts.set(genre, (counts.get(genre) ?? 0) + 1);
   }
-
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 8)
-    .map(([genre, count]) => ({ genre, count }));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 }
 
 export default async function Home() {
-  const topRatedIdsPromise = fetchTopRatedMidiIds(15, 2);
-
-  const [
-    { data: popularMidis },
-    { data: latestMidis },
-    { data: pdfMidis },
-    topRatedIds,
-  ] = await Promise.all([
+  const [{ data: popular }, { data: latest }, { data: withPdf }, topRatedIds] = await Promise.all([
     pocketbase.from("music_files").select("*").order("downloads", { ascending: false }).limit(15),
     pocketbase.from("music_files").select("*").order("created_at", { ascending: false }).limit(15),
     pocketbase.from("music_files").select("*").not("pdf_url", "is", null).order("created_at", { ascending: false }).limit(15),
-    topRatedIdsPromise,
+    fetchTopRatedIds(),
   ]);
 
-  const { data: topRatedMidis, error: topRatedErr } =
-    topRatedIds.length > 0
-      ? await pocketbase.from("music_files").select("*").in("id", topRatedIds)
-      : { data: [], error: null };
+  const { data: ratedRows, error: ratedError } = topRatedIds.length
+    ? await pocketbase.from("music_files").select("*").in("id", topRatedIds)
+    : { data: [], error: null };
+  if (ratedError) console.error("top rated MIDI fetch error:", ratedError);
 
-  if (topRatedErr) console.error("topRatedMidis fetch error:", topRatedErr);
+  const popularRows = (popular ?? []) as MidiRow[];
+  const latestRows = (latest ?? []) as MidiRow[];
+  const pdfRows = (withPdf ?? []) as MidiRow[];
+  const topRatedRows = ((ratedRows ?? []) as MidiRow[]).sort((a, b) => topRatedIds.indexOf(a.id) - topRatedIds.indexOf(b.id));
+  const allRows = [...popularRows, ...latestRows, ...pdfRows, ...topRatedRows];
+  const uniqueRows = [...new Map(allRows.map((row) => [row.id, row])).values()];
+  const ratings = await fetchRatings(uniqueRows.map((row) => row.id));
+  const genres = collectGenres(uniqueRows);
+  const totalDownloads = uniqueRows.reduce((sum, row) => sum + Number(row.downloads ?? 0), 0);
+  const ratingCount = [...ratings.values()].reduce((sum, rating) => sum + rating.count, 0);
 
-  const topRatedOrdered = ((topRatedMidis ?? []) as MidiRow[]).slice().sort(
-    (a, b) => topRatedIds.indexOf(a.id) - topRatedIds.indexOf(b.id)
-  );
-
-  const shownRows = [
-    ...((popularMidis ?? []) as MidiRow[]),
-    ...((latestMidis ?? []) as MidiRow[]),
-    ...((pdfMidis ?? []) as MidiRow[]),
-    ...topRatedOrdered,
-  ];
-
-  const allIds = Array.from(new Set(shownRows.map((midi) => midi.id)));
-  const ratingMap = await fetchRatingAggForMidiIds(allIds);
-  const topGenres = topGenresFrom(shownRows);
-
-  const getAvg = (id: string) => {
-    const agg = ratingMap.get(id);
-    if (!agg || agg.count === 0) return { avgRating: null, ratingCount: 0 };
-    return { avgRating: agg.sum / agg.count, ratingCount: agg.count };
+  const getRating = (id: string) => {
+    const value = ratings.get(id);
+    return value ? { avgRating: value.sum / value.count, ratingCount: value.count } : { avgRating: null, ratingCount: 0 };
   };
 
-  const hasPopular = (popularMidis?.length ?? 0) > 0;
-  const hasLatest = (latestMidis?.length ?? 0) > 0;
-  const hasPdf = (pdfMidis?.length ?? 0) > 0;
-  const hasTopRated = topRatedOrdered.length > 0;
-  const totalDownloads = shownRows.reduce((sum, midi) => sum + (midi.downloads ?? 0), 0);
+  const ticker = ["MIDI files", "Sheet music", "Creator ranks", "Community ratings", ...genres.map(([genre]) => genre)];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] text-white">
-      <section className="relative overflow-hidden border-b border-white/10">
-        {/* Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:52px_52px]" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
-        {/* Aurora blobs */}
-        <div
-          className="aurora-spot opacity-70"
-          style={{ width: "45%", height: "55%", background: "radial-gradient(circle, rgba(59,130,246,0.18), transparent 70%)", top: "-10%", left: "-8%", "--dur": "13s", "--dx": "4%", "--dy": "5%" } as React.CSSProperties}
+    <main className="gmm-home">
+      <section className="gmm-home-hero">
+        <Image
+          src="/givememidi-editorial-hero.png"
+          alt="Sheet music and a MIDI keyboard in a dark recording studio"
+          fill
+          priority
+          sizes="100vw"
+          className="gmm-home-hero-image"
         />
-        <div
-          className="aurora-spot opacity-60"
-          style={{ width: "38%", height: "45%", background: "radial-gradient(circle, rgba(139,92,246,0.14), transparent 70%)", bottom: "-8%", right: "8%", "--dur": "11s", "--dx": "-4%", "--dy": "-3%" } as React.CSSProperties}
-        />
-        <div
-          className="aurora-spot opacity-50"
-          style={{ width: "28%", height: "35%", background: "radial-gradient(circle, rgba(34,211,238,0.12), transparent 70%)", top: "25%", right: "18%", "--dur": "9s", "--dx": "3%", "--dy": "-5%" } as React.CSSProperties}
-        />
-        <FloatingNotes />
-
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-16 md:grid-cols-[1.05fr_0.95fr] md:pb-18 md:pt-24">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-blue-100 backdrop-blur">
-              <Sparkles size={16} className="text-cyan-300" />
-              MIDI, PDF scores, ratings, bookmarks, and creator discovery.
-            </div>
-
-            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight md:text-6xl">
-              Find the{" "}
-              <span className="gradient-text">MIDI</span>{" "}
-              that gets your idea moving.
-            </h1>
-
-            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-              Browse community uploads, preview arrangements, collect favorites, and share your own MIDI with optional sheet music.
+        <div className="gmm-home-hero-shade" />
+        <div className="gmm-shell gmm-home-hero-content">
+          <AnimateIn direction="up">
+            <p className="gmm-kicker">Community MIDI library / 2026</p>
+            <h1 className="gmm-display">Find your next <span>MIDI.</span></h1>
+            <p className="gmm-home-intro">
+              Discover arrangements, preview the music, collect the keepers, and share work that deserves to be played.
             </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/midi"
-                className="btn-glow btn-press inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg shadow-blue-950/40"
-              >
-                <Search size={18} />
-                Browse MIDI
-              </Link>
-              <Link
-                href="/upload"
-                className="btn-press inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
-              >
-                <UploadCloud size={18} />
-                Upload a file
-              </Link>
+            <div className="gmm-home-actions">
+              <Link href="/midi" className="gmm-button-primary"><Search size={17} /> Explore library</Link>
+              <Link href="/upload" className="gmm-button-secondary"><Upload size={17} /> Upload a file</Link>
             </div>
+          </AnimateIn>
 
-            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3 stagger-children">
-              <Stat label="Popular picks" value={hasPopular ? `${popularMidis!.length} featured` : "None yet"} />
-              <Stat label="New uploads" value={hasLatest ? `${latestMidis!.length} latest` : "None yet"} />
-              <Stat label="Sheet music" value={hasPdf ? `${pdfMidis!.length} with PDF` : "None yet"} />
-            </div>
-
-            {topGenres.length > 0 ? <FeaturedGenres genres={topGenres} /> : null}
-
-            <div className="mt-7 grid max-w-2xl gap-3 sm:grid-cols-2">
-              <MiniFeature
-                icon={<Award size={17} />}
-                title="Creator awards"
-                text="Uploads, ratings, and downloads help creators build visible progress."
-              />
-              <MiniFeature
-                icon={<Bookmark size={17} />}
-                title="Personal library"
-                text="Bookmark useful MIDI files and return to them without digging."
-              />
-            </div>
-          </div>
-
-          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-5 shadow-2xl shadow-blue-950/20 backdrop-blur glow-blue">
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(59,130,246,0.14),transparent_35%),linear-gradient(315deg,rgba(34,211,238,0.12),transparent_35%)]" />
-            <div className="scan-line" />
-            <div className="relative flex h-full flex-col justify-between" style={{ zIndex: 2 }}>
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-200">
-                  <Music2 size={16} className="text-cyan-300" />
-                  Live discovery
-                </div>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/20">
-                  Community powered
-                </span>
-              </div>
-
-              <div className="mt-10 space-y-4">
-                {((popularMidis ?? []) as MidiRow[]).slice(0, 4).map((midi, index) => (
-                  <Link
-                    key={midi.id}
-                    href={`/midi/${midi.id}`}
-                    className="card-lift flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur transition hover:border-cyan-300/35 hover:bg-white/[0.085]"
-                    style={{ animationDelay: `${index * 90}ms` }}
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-400/15 text-blue-100 ring-1 ring-blue-300/20">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-white">{midi.title}</p>
-                      <p className="truncate text-sm text-slate-400">{midi.composer || "Unknown composer"}</p>
-                    </div>
-                    <ArrowRight size={18} className="text-slate-500" />
-                  </Link>
-                ))}
-              </div>
-
-              <div className="mt-8 h-24 overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex h-full items-end gap-1.5">
-                  {Array.from({ length: 34 }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="motion-bar block flex-1 rounded-t bg-gradient-to-t from-blue-500/45 to-cyan-300/80"
-                      style={{ height: `${24 + ((i * 23) % 62)}%`, animationDelay: `${i * 40}ms` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div className="gmm-hero-index">
+            <span>01</span>
+            <p>Built for listeners, arrangers, performers, and the unfinished idea waiting in your DAW.</p>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 pt-10">
-        <AnimateIn direction="up" delay={0.05}>
-          <div className="grid gap-4 lg:grid-cols-4 stagger-children">
-            <DiscoveryTile
-              icon={<Flame size={20} className="text-orange-400" />}
-              label="Popular"
-              value={hasPopular ? `${popularMidis!.length} picks` : "Starting soon"}
-              href="/midi?sort=downloads"
-              colorClass="tile-flame"
-              iconBg="bg-orange-400/10 ring-orange-400/20"
-            />
-            <DiscoveryTile
-              icon={<Star size={20} className="text-yellow-400" />}
-              label="Top rated"
-              value={hasTopRated ? `${topRatedOrdered.length} favorites` : "Needs ratings"}
-              href="/midi"
-              colorClass="tile-gold"
-              iconBg="bg-yellow-400/10 ring-yellow-400/20"
-            />
-            <DiscoveryTile
-              icon={<FileText size={20} className="text-emerald-400" />}
-              label="Sheet music"
-              value={hasPdf ? `${pdfMidis!.length} PDFs` : "Upload PDFs"}
-              href="/midi"
-              colorClass="tile-emerald"
-              iconBg="bg-emerald-400/10 ring-emerald-400/20"
-            />
-            <DiscoveryTile
-              icon={<Users size={20} className="text-violet-400" />}
-              label="Creators"
-              value={totalDownloads > 0 ? `${totalDownloads} downloads` : "Join in"}
-              href="/creators"
-              colorClass="tile-violet"
-              iconBg="bg-violet-400/10 ring-violet-400/20"
-            />
-          </div>
-        </AnimateIn>
+      <div className="gmm-ticker" aria-label="GiveMeMIDI features">
+        <div className="gmm-ticker-track">
+          {[...ticker, ...ticker].map((item, index) => <span className="gmm-ticker-item" key={`${item}-${index}`}>{item}</span>)}
+        </div>
+      </div>
+
+      <section className="gmm-metric-strip">
+        <div className="gmm-shell">
+          <HomeMetric index="01" label="Library snapshot" value={formatMetric(uniqueRows.length)} detail="featured files" />
+          <HomeMetric index="02" label="Sheet music" value={formatMetric(pdfRows.length)} detail="PDF arrangements" />
+          <HomeMetric index="03" label="Community reach" value={formatMetric(totalDownloads)} detail="downloads" />
+          <HomeMetric index="04" label="Listener signal" value={formatMetric(ratingCount)} detail="ratings" />
+        </div>
       </section>
 
-      <section className="mx-auto max-w-7xl space-y-14 px-6 pb-24 pt-12">
-        <AnimateIn direction="up">
-          <div className="hover-shine border-glow rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.045] to-cyan-300/10 p-6 shadow-xl shadow-black/20 md:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/80">
-                  Creator rewards
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">
-                  Uploads should feel{" "}
-                  <span className="text-gradient-brand">worth it.</span>
-                </h2>
-                <p className="mt-3 max-w-2xl leading-7 text-slate-300">
-                  GiveMeMIDI highlights creator momentum through ratings, bookmarks, downloads, and upload progress, so contributors get more than a quiet file listing.
-                </p>
-              </div>
+      <EditorialSection className="gmm-discovery-band" tone="raised">
+        <EditorialHeading
+          eyebrow="Start somewhere"
+          title="The library has range."
+          description="Move through the strongest signals in the collection, or begin with the style already in your head."
+        />
+        <div className="gmm-discovery-grid">
+          <DiscoveryLink index="01" href="/midi?sort=downloads" icon={<Headphones size={18} />} title="Most played" detail={`${popularRows.length} current picks`} />
+          <DiscoveryLink index="02" href="/midi" icon={<Sparkles size={18} />} title="Fresh uploads" detail={`${latestRows.length} new arrivals`} />
+          <DiscoveryLink index="03" href="/creators" icon={<Users size={18} />} title="Creators" detail="Meet the contributors" />
+          <DiscoveryLink index="04" href="/bookmarks" icon={<Bookmark size={18} />} title="Your collection" detail="Return to saved work" />
+        </div>
+        {genres.length ? (
+          <div className="gmm-genre-index">
+            <span>Browse by genre</span>
+            <div>{genres.map(([genre, count]) => <Link key={genre} href={`/midi?genre=${encodeURIComponent(genre)}`}>{genre}<small>{count}</small></Link>)}</div>
+          </div>
+        ) : null}
+      </EditorialSection>
 
-              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 stagger-children">
-                <RewardMetric label="Rate" value="Stars" icon="⭐" />
-                <RewardMetric label="Collect" value="Bookmarks" icon="🔖" />
-                <RewardMetric label="Share" value="Uploads" icon="🚀" />
-              </div>
+      <CollectionSection eyebrow="Trending now" title="Popular MIDI" description="The files listeners are taking with them." href="/midi?sort=downloads" rows={popularRows} getRating={getRating} />
+      <CollectionSection eyebrow="Just landed" title="Latest uploads" description="New arrangements from across the community." href="/midi" rows={latestRows} getRating={getRating} tone="raised" />
+
+      <section className="gmm-creator-band">
+        <div className="gmm-shell">
+          <p className="gmm-kicker">Creator rewards</p>
+          <div className="gmm-creator-statement">
+            <h2>Uploads should earn more than a quiet listing.</h2>
+            <div>
+              <p>Build rank through uploads, ratings, bookmarks, and real listener activity. Your contribution stays visible.</p>
+              <Link href="/awards">See how ranks work <ArrowRight size={16} /></Link>
             </div>
           </div>
-        </AnimateIn>
-
-        <AnimateIn direction="up" delay={0.05}>
-          <MidiSection
-            title="Popular MIDI files"
-            subtitle="The most downloaded files right now."
-            href="/midi?sort=downloads"
-            linkLabel="View all"
-            rows={(popularMidis ?? []) as MidiRow[]}
-            getAvg={getAvg}
-            emptyTitle="No popular files yet"
-            emptySubtitle="Once people start downloading, your top files will show up here."
-          />
-        </AnimateIn>
-
-        <div className="divider-gradient" />
-
-        <AnimateIn direction="up" delay={0.05}>
-          <MidiSection
-            title="Latest uploads"
-            subtitle="Fresh uploads added recently."
-            href="/midi"
-            linkLabel="Browse latest"
-            rows={(latestMidis ?? []) as MidiRow[]}
-            getAvg={getAvg}
-            emptyTitle="No uploads yet"
-            emptySubtitle="Be the first to upload a MIDI file."
-            ctaHref="/upload"
-            ctaLabel="Upload MIDI"
-          />
-        </AnimateIn>
-
-        <div className="divider-gradient" />
-
-        <AnimateIn direction="up" delay={0.05}>
-          <MidiSection
-            title="Highest rated"
-            subtitle="Community favorites by average rating."
-            href="/midi"
-            linkLabel="View all"
-            rows={topRatedOrdered}
-            getAvg={getAvg}
-            emptyTitle="No rated files yet"
-            emptySubtitle="Once people start rating uploads, the top-rated files will show up here."
-          />
-        </AnimateIn>
-
-        <div className="divider-gradient" />
-
-        <AnimateIn direction="up" delay={0.05}>
-          <MidiSection
-            title="With sheet music"
-            subtitle="MIDI files that include downloadable PDF sheet music."
-            href="/midi"
-            linkLabel="Explore PDFs"
-            rows={(pdfMidis ?? []) as MidiRow[]}
-            getAvg={getAvg}
-            emptyTitle="No PDFs uploaded yet"
-            emptySubtitle="Upload a sheet music PDF with your MIDI and it will appear here."
-            ctaHref="/upload"
-            ctaLabel="Upload MIDI + PDF"
-          />
-        </AnimateIn>
-
-        <AnimateIn direction="up" delay={0.05}>
-          <div className="hover-shine border-glow relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] p-6 shadow-xl shadow-black/20 md:p-8">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(59,130,246,0.08),transparent_60%)]" />
-            <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-              <div>
-                <h3 className="text-2xl font-black">
-                  Build your{" "}
-                  <span className="text-gradient-brand">collection</span>
-                </h3>
-                <p className="mt-2 max-w-2xl text-gray-300">
-                  Upload MIDI, attach optional sheet music, rate discoveries, and bookmark favorites to keep your creative reference library close.
-                </p>
-              </div>
-
-              <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-                <Link
-                  href="/upload"
-                  className="btn-glow btn-press inline-flex justify-center rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg"
-                >
-                  Upload
-                </Link>
-                <Link
-                  href="/bookmarks"
-                  className="btn-press inline-flex justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-6 py-3 font-bold text-gray-100 transition hover:border-cyan-300/40 hover:bg-white/[0.08]"
-                >
-                  View bookmarks
-                </Link>
-              </div>
-            </div>
+          <div className="gmm-reward-steps">
+            <span><strong>01</strong> Share</span><span><strong>02</strong> Get heard</span><span><strong>03</strong> Build rank</span>
           </div>
-        </AnimateIn>
+        </div>
       </section>
+
+      <CollectionSection eyebrow="Community signal" title="Highest rated" description="Arrangements backed by repeat listener approval." href="/midi" rows={topRatedRows} getRating={getRating} />
+      <CollectionSection eyebrow="Read and play" title="With sheet music" description="MIDI files paired with downloadable PDF scores." href="/midi" rows={pdfRows} getRating={getRating} tone="raised" />
+
+      <EditorialSection className="gmm-home-final" tone="accent">
+        <div>
+          <p className="gmm-kicker">Your move</p>
+          <h2>Open the library. Find the part you were missing.</h2>
+        </div>
+        <div className="gmm-home-final-actions">
+          <Link href="/midi">Browse every MIDI <ArrowRight size={17} /></Link>
+          <Link href="/upload"><FileMusic size={17} /> Add your own</Link>
+        </div>
+      </EditorialSection>
     </main>
   );
 }
 
-function MidiSection({
-  title,
-  subtitle,
-  href,
-  linkLabel,
-  rows,
-  getAvg,
-  emptyTitle,
-  emptySubtitle,
-  ctaHref,
-  ctaLabel,
-}: {
+function HomeMetric({ index, label, value, detail }: { index: string; label: string; value: string; detail: string }) {
+  return <div><span>{index}</span><p>{label}</p><strong>{value}</strong><small>{detail}</small></div>;
+}
+
+function DiscoveryLink({ index, href, icon, title, detail }: { index: string; href: string; icon: React.ReactNode; title: string; detail: string }) {
+  return <Link href={href}><span>{index}</span><i>{icon}</i><strong>{title}</strong><small>{detail}</small><ArrowRight size={17} /></Link>;
+}
+
+function CollectionSection({ eyebrow, title, description, href, rows, getRating, tone = "base" }: {
+  eyebrow: string;
   title: string;
-  subtitle: string;
+  description: string;
   href: string;
-  linkLabel: string;
   rows: MidiRow[];
-  getAvg: (id: string) => { avgRating: number | null; ratingCount: number };
-  emptyTitle: string;
-  emptySubtitle: string;
-  ctaHref?: string;
-  ctaLabel?: string;
+  getRating: (id: string) => { avgRating: number | null; ratingCount: number };
+  tone?: "base" | "raised";
 }) {
   return (
-    <section className="space-y-5">
-      <SectionHeader title={title} subtitle={subtitle} href={href} linkLabel={linkLabel} />
-      {rows.length > 0 ? (
+    <EditorialSection className="gmm-collection-band" tone={tone}>
+      <AnimateIn direction="up">
+        <EditorialHeading
+          eyebrow={eyebrow}
+          title={title}
+          description={description}
+          action={<Link href={href} className="gmm-section-link">View all <ArrowRight size={15} /></Link>}
+        />
+      </AnimateIn>
+      {rows.length ? (
         <MidiRowScroller itemCount={rows.length}>
           {rows.map((midi) => {
-            const { avgRating, ratingCount } = getAvg(midi.id);
-
+            const rating = getRating(midi.id);
             return (
-              <div key={midi.id} className="snap-start shrink-0 w-[280px] sm:w-[320px]">
+              <div key={midi.id} className="w-[280px] shrink-0 snap-start sm:w-[320px]">
                 <MidiCard
                   id={midi.id}
                   title={midi.title}
@@ -486,8 +251,8 @@ function MidiSection({
                   pdfUrl={midi.pdf_url || null}
                   genre={midi.genre}
                   bpm={midi.bpm}
-                  avgRating={avgRating}
-                  ratingCount={ratingCount}
+                  avgRating={rating.avgRating}
+                  ratingCount={rating.ratingCount}
                   createdAt={midi.created_at}
                   durationSeconds={midi.duration_seconds ?? midi.duration}
                 />
@@ -496,155 +261,8 @@ function MidiSection({
           })}
         </MidiRowScroller>
       ) : (
-        <EmptyState title={emptyTitle} subtitle={emptySubtitle} ctaHref={ctaHref} ctaLabel={ctaLabel} />
+        <div className="gmm-empty-line"><span>No files here yet.</span><Link href="/upload">Upload the first one <ArrowRight size={15} /></Link></div>
       )}
-    </section>
-  );
-}
-
-function FeaturedGenres({ genres }: { genres: { genre: string; count: number }[] }) {
-  return (
-    <div className="mt-7">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Start with a genre</p>
-      <div className="mt-3 flex flex-wrap gap-2 stagger-children">
-        {genres.map(({ genre, count }) => (
-          <Link
-            key={genre}
-            href={`/midi?genre=${encodeURIComponent(genre)}`}
-            className="btn-press rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]"
-          >
-            {genre} <span className="text-slate-500">{count}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MiniFeature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <div className="card-glow rounded-2xl border border-white/10 bg-white/[0.045] p-4 hover:bg-white/[0.07]">
-      <div className="flex items-center gap-2 text-sm font-bold text-white">
-        <span className="text-cyan-300 float">{icon}</span>
-        {title}
-      </div>
-      <p className="mt-2 text-xs leading-5 text-slate-400">{text}</p>
-    </div>
-  );
-}
-
-function DiscoveryTile({
-  icon,
-  label,
-  value,
-  href,
-  colorClass = "",
-  iconBg = "bg-blue-400/10 ring-blue-300/20",
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  href: string;
-  colorClass?: string;
-  iconBg?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`hover-shine card-lift group rounded-3xl border border-white/10 bg-white/[0.045] p-5 transition-all ${colorClass}`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-110 ${iconBg}`}>
-          {icon}
-        </span>
-        <ArrowRight size={17} className="text-slate-500 transition-transform group-hover:translate-x-1" />
-      </div>
-      <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-black text-white">{value}</p>
-    </Link>
-  );
-}
-
-function RewardMetric({ label, value, icon }: { label: string; value: string; icon?: string }) {
-  return (
-    <div className="card-glow flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-4">
-      {icon && <span className="text-xl">{icon}</span>}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-        <p className="mt-0.5 font-black text-white">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card-glow rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-left hover:bg-white/[0.08]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-white">{value}</p>
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  subtitle,
-  href,
-  linkLabel,
-}: {
-  title: string;
-  subtitle: string;
-  href: string;
-  linkLabel: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-          <p className="text-gray-400">{subtitle}</p>
-        </div>
-
-        <Link
-          href={href}
-          className="group inline-flex items-center gap-1 self-start text-sm font-bold text-cyan-200 transition hover:text-white md:self-auto"
-        >
-          {linkLabel}
-          <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
-        </Link>
-      </div>
-      <div className="divider-gradient" />
-    </div>
-  );
-}
-
-function EmptyState({
-  title,
-  subtitle,
-  ctaHref,
-  ctaLabel,
-}: {
-  title: string;
-  subtitle: string;
-  ctaHref?: string;
-  ctaLabel?: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-8 text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] text-2xl">
-        🎵
-      </div>
-      <h3 className="text-lg font-bold">{title}</h3>
-      <p className="mt-1 text-gray-400">{subtitle}</p>
-
-      {ctaHref && ctaLabel ? (
-        <Link
-          href={ctaHref}
-          className="btn-glow btn-press mt-5 inline-flex rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-6 py-3 font-bold shadow-lg"
-        >
-          {ctaLabel}
-        </Link>
-      ) : null}
-    </div>
+    </EditorialSection>
   );
 }
