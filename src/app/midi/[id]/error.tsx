@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import Link from "next/link";
 
 export default function MidiError({
   error,
@@ -13,38 +13,38 @@ export default function MidiError({
   console.error("MIDI page boundary caught an error:", error);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#111827_0%,#020617_42%,#000_100%)] px-6 py-16 text-white">
-      <section className="mx-auto max-w-2xl rounded-[2rem] border border-red-300/20 bg-white/[0.045] p-6 shadow-2xl shadow-black/30">
-        <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-300/20 bg-red-300/10 text-red-100">
-            <AlertTriangle size={22} />
-          </span>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-100/75">
-              MIDI page interrupted
-            </p>
-            <h1 className="mt-1 text-2xl font-black">This MIDI page hit a loading problem.</h1>
-            <p className="mt-3 leading-7 text-slate-300">
-              Your browser is still fine. Retry the MIDI page, or return to the library.
-            </p>
+    <main className="gmm-public-page min-h-[72vh] border-y border-white/10 bg-[#02050a] px-6 py-20 text-white sm:py-28">
+      <section className="gmm-shell grid items-end gap-10 border-y border-white/10 py-12 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="max-w-3xl">
+          <p className="gmm-kicker">MIDI detail / recovery</p>
+          <div className="mt-6 flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border border-amber-300/25 bg-amber-300/10 text-amber-200">
+              <AlertTriangle size={23} />
+            </span>
+            <div>
+              <h1 className="text-3xl font-black leading-tight sm:text-5xl">This arrangement could not load.</h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
+                Retry the record without losing your place, or return to the full library and keep browsing.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
           <button
             type="button"
             onClick={reset}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 px-5 py-3 text-sm font-bold text-white transition hover:brightness-110"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-5 text-sm font-black text-slate-950 transition hover:bg-cyan-200"
           >
             <RefreshCw size={17} />
-            Retry page
+            Retry MIDI
           </button>
           <Link
             href="/midi"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.045] px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/10"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/15 px-5 text-sm font-bold text-slate-200 transition hover:border-cyan-300/40 hover:text-white"
           >
             <ArrowLeft size={17} />
-            Back to MIDI
+            Back to library
           </Link>
         </div>
       </section>

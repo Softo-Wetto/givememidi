@@ -1,11 +1,17 @@
 "use client";
 
+import { advancePointerDrag, beginPointerDrag } from "@/lib/pointer-drag";
 import { ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function MidiRowScroller({ children, itemCount }: { children: React.ReactNode; itemCount: number }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const drag = useRef({ active: false, dragged: false, pointerId: 0, startX: 0, startScrollLeft: 0 });
+  const drag = useRef({
+    active: false,
+    pointerId: 0,
+    startScrollLeft: 0,
+    gesture: beginPointerDrag(0),
+  });
   const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
   const showControls = itemCount > 3;
@@ -42,17 +48,30 @@ export function MidiRowScroller({ children, itemCount }: { children: React.React
     const element = ref.current;
     if (!element || (event.pointerType === "mouse" && event.button !== 0)) return;
     if ((event.target as HTMLElement).closest("button, input, textarea, select")) return;
-    drag.current = { active: true, dragged: false, pointerId: event.pointerId, startX: event.clientX, startScrollLeft: element.scrollLeft };
-    element.setPointerCapture(event.pointerId);
-    setDragging(true);
+    drag.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startScrollLeft: element.scrollLeft,
+      gesture: beginPointerDrag(event.clientX),
+    };
   };
 
   const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const element = ref.current;
     const state = drag.current;
     if (!element || !state.active || state.pointerId !== event.pointerId) return;
-    const delta = event.clientX - state.startX;
-    if (Math.abs(delta) > 6) state.dragged = true;
+
+    const result = advancePointerDrag(state.gesture, event.clientX);
+    state.gesture = result.state;
+    if (!result.dragged) return;
+
+    if (result.capturePointer) {
+      element.setPointerCapture(event.pointerId);
+      setDragging(true);
+    }
+
+    event.preventDefault();
+    const delta = event.clientX - state.gesture.startX;
     element.scrollLeft = state.startScrollLeft - delta;
   };
 
@@ -74,10 +93,10 @@ export function MidiRowScroller({ children, itemCount }: { children: React.React
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={(event) => {
-          if (!drag.current.dragged) return;
+          if (!drag.current.gesture.dragged) return;
           event.preventDefault();
           event.stopPropagation();
-          drag.current.dragged = false;
+          drag.current.gesture = beginPointerDrag(0);
         }}
       >
         {children}
